@@ -35,10 +35,10 @@
 #include "data/font-8x8-full-invert.inc"
 //#include "data/cbios-font-white.inc"
 
-int btnHeld = 0;     // buttons held right now
-int btnPressed = 0;  // buttons pressed this frame
-int btnReleased = 0; // buttons released this frame
-int btnPrev = 0;	 // buttons previously pressed
+int btnHeld = 0;		// buttons held right now
+int btnPressed = 0;		// buttons pressed this frame
+int btnReleased = 0;	// buttons released this frame
+int btnPrev = 0;		// buttons previously pressed
 
 int wallpaperTile = 1; // default wallpaper tile is 1
 
@@ -138,7 +138,7 @@ void updateCursor() {
 
 	/*int mouse = ReadJoypadExt(1); // copied from whack-a-mole
 	btnPressed = mouse & (mouse ^ btnPrev);
-    //btnReleased = btnPrev & (mouse ^ btnPrev);
+	//btnReleased = btnPrev & (mouse ^ btnPrev);
 
 	if (mouse & 0x80) {
 		cursor.x -= (mouse&0x7f);
@@ -173,8 +173,8 @@ void updateCursor() {
 
 void updateController() {
 	btnHeld = ReadJoypad(0);
-    btnPressed = btnHeld & (btnHeld ^ btnPrev);
-    btnReleased = btnPrev & (btnHeld ^ btnPrev);
+	btnPressed = btnHeld & (btnHeld ^ btnPrev);
+	btnReleased = btnPrev & (btnHeld ^ btnPrev);
 
 	if (btnHeld & BTN_UP && cursor.y > 0) {
 		cursor.y--;
