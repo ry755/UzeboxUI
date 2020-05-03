@@ -1,5 +1,5 @@
 /*
- *  GUI Test
+ *  UzeboxUI
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
  *  Uzebox is a reserved trade mark
 */
 
-// mouse cursor image from here: https://opengameart.org/content/simple-light-graysacle-cursors-16x16
+// 16x16 mouse cursor sprite from here (currently unused): https://opengameart.org/content/simple-light-graysacle-cursors-16x16
 
 #include <stdbool.h>
 #include <avr/io.h>
@@ -40,7 +40,7 @@ int btnPressed = 0;  // buttons pressed this frame
 int btnReleased = 0; // buttons released this frame
 int btnPrev = 0;	 // buttons previously pressed
 
-int wallpaperTile = 1;
+int wallpaperTile = 1; // default wallpaper tile is 1
 
 struct EepromBlockStruct ebs;
 
@@ -89,7 +89,7 @@ const char cursor_map[] PROGMEM = {
 	1 // tile indexes
 };
 
-int activeWindow = 0;
+int activeWindow = 0; // keeps track of the window number that's currently active and being updated
 
 int fontColor;
 #define whitebg 0
@@ -102,11 +102,11 @@ struct Window {
 	int sizeX;
 	int sizeY;
 	char title[10];
-	int titleSize;
+	int titleSize; // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
 	int clickX;
 	int clickY;
-	int prevX; // used while dragging
-	int prevY;
+	int prevX; // used while dragging to prevent the screen constantly being redrawn
+	int prevY; // ^
 	bool dragging;
 } window[10];
 
@@ -114,7 +114,7 @@ struct Button {
 	bool created;
 	int (*callback)(); // function that gets called when button is clicked
 	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
-	int window; // window that this button lives on
+	int window; // window number that this button lives on
 } button[100];
 
 struct Cursor {
@@ -132,8 +132,8 @@ struct Menu {
 } menu;
 
 void updateCursor() {
-	//MoveSprite(0,cursor.x,cursor.y,2,2); // good looking, but too big
-	sprites[0].x = cursor.x; // looks like garbage lol but it's smaller
+	//MoveSprite(0,cursor.x,cursor.y,2,2); // 16x16, good looking but too big
+	sprites[0].x = cursor.x;
 	sprites[0].y = cursor.y;
 
 	/*int mouse = ReadJoypadExt(1); // copied from whack-a-mole
@@ -178,26 +178,20 @@ void updateController() {
 
 	if (btnHeld & BTN_UP && cursor.y > 0) {
 		cursor.y--;
-		//cursor.y = cursor.y - 2;
 	}
 	if (btnHeld & BTN_DOWN && cursor.y < 216) {
 		cursor.y++;
-		//cursor.y = cursor.y + 2;
 	}
 	if (btnHeld & BTN_LEFT && cursor.x > 0) {
 		cursor.x--;
-		//cursor.x = cursor.x - 2;
 	}
 	if (btnHeld & BTN_RIGHT && cursor.x < 240) {
 		cursor.x++;
-		//cursor.x = cursor.x + 2;
 	}
 	if (btnPressed & BTN_A) {
-		// click
 		cursor.click = true;
 	}
 	if (btnHeld & BTN_A) {
-		// hold
 		cursor.hold = true;
 	}
 	if (btnReleased & BTN_A) {
@@ -319,7 +313,6 @@ void updateClick() {
 			menu.open = false; // close the menu
 			WaitVsync(1);
 
-			//restoreVram();
 			drawWallpaper();
 			redrawAll();
 		}
@@ -342,13 +335,12 @@ void updateClick() {
 				if (!menu.open) { // menu isn't already open, let's open it
 					menu.open = true;
 					menu.selectedMenu = 1;
-					//saveVram();
 					WaitVsync(1);
 				} else { // menu is already open, let's close it
 					menu.open = false;
 					menu.selectedMenu = 0;
 					menu.selectedMenuItem = 0;
-					//restoreVram();
+
 					drawWallpaper();
 					redrawAll();
 					WaitVsync(1);
@@ -359,13 +351,12 @@ void updateClick() {
 				if (!menu.open) { // menu isn't already open, let's open it
 					menu.open = true;
 					menu.selectedMenu = 2;
-					//saveVram();
 					WaitVsync(1);
 				} else { // menu is already open, let's close it
 					menu.open = false;
 					menu.selectedMenu = 0;
 					menu.selectedMenuItem = 0;
-					//restoreVram();
+					
 					drawWallpaper();
 					redrawAll();
 					WaitVsync(1);
@@ -376,13 +367,12 @@ void updateClick() {
 				if (!menu.open) { // menu isn't already open, let's open it
 					menu.open = true;
 					menu.selectedMenu = 3;
-					//saveVram();
 					WaitVsync(1);
 				} else { // menu is already open, let's close it
 					menu.open = false;
 					menu.selectedMenu = 0;
 					menu.selectedMenuItem = 0;
-					//restoreVram();
+
 					drawWallpaper();
 					redrawAll();
 					WaitVsync(1);
@@ -393,13 +383,12 @@ void updateClick() {
 				if (!menu.open) { // menu isn't already open, let's open it
 					menu.open = true;
 					menu.selectedMenu = 4;
-					//saveVram();
 					WaitVsync(1);
 				} else { // menu is already open, let's close it
 					menu.open = false;
 					menu.selectedMenu = 0;
 					menu.selectedMenuItem = 0;
-					//restoreVram();
+
 					drawWallpaper();
 					redrawAll();
 					WaitVsync(1);
@@ -473,30 +462,20 @@ void updateActiveWindow() {
 
 		if (window[getActiveWindow()].dragging) {
 			if (window[getActiveWindow()].x != window[getActiveWindow()].prevX || window[getActiveWindow()].y != window[getActiveWindow()].prevY) {
-				//restoreVram();
-				//Fill(window[getActiveWindow()].x-1,window[getActiveWindow()].y-2,window[getActiveWindow()].sizeX+2,window[getActiveWindow()].sizeY+3,1); // fill in background tile when window moves
 				drawWallpaper(); // redraw wallpaper to remove old window tiles
 				window[getActiveWindow()].prevX = window[getActiveWindow()].x;
 				window[getActiveWindow()].prevY = window[getActiveWindow()].y;
 				redrawAll(); // hacky, but it works. this redraws all windows on the screen
 			}
-			//restoreVram();
 			window[getActiveWindow()].x = (cursor.x/8)-(window[getActiveWindow()].sizeX/2);
 			window[getActiveWindow()].y = (cursor.y/8)+1;
 		}
 
 		for (int x=window[getActiveWindow()].x; x<window[getActiveWindow()].sizeX+window[getActiveWindow()].x; x++) {
 			for (int y=window[getActiveWindow()].y; y<window[getActiveWindow()].sizeY+window[getActiveWindow()].y; y++) {
-				//SetTile(x,y,SpiRamReadU8(1,x+y*getActiveWindow()));
-				//SetTile(x,y,SpiRamReadU8(1,(((y-window[getActiveWindow()].y)*window[getActiveWindow()].sizeY)+(x-window[getActiveWindow()].x))+(getActiveWindow()*(24*29))));
 				SetTile(x,y,SpiRamReadU8(1,(((y-window[getActiveWindow()].y)*window[getActiveWindow()].sizeX)+(x-window[getActiveWindow()].x))+(getActiveWindow()*(24*29))));
 			}
 		}
-
-		//Fill(1,25,10,1,wallpaperTile);
-	} else {
-		//setFontColor(whitebg);
-		//Print(1,25,PSTR("Slot empty"));
 	}
 }
 
@@ -508,7 +487,6 @@ void updateInactiveTitlebars() {
 			for (int curChar=0; curChar<window[i].titleSize; curChar++) { // print title
 				PrintChar(window[i].x+curChar+1,window[i].y-1,window[i].title[curChar]);
 			}
-			//SetTile(window[i].x,window[i].y-1,14); // draw close button
 		}
 	}
 }
@@ -516,7 +494,7 @@ void updateInactiveTitlebars() {
 void redrawAll() {
 	int prevActive = getActiveWindow(); // save window that was active before running this
 
-	for (int i=0; i<10; i++) {
+	for (int i=0; i<10; i++) { // redraw all windows
 		setActiveWindow(i);
 		updateActiveWindow();
 	}
@@ -529,18 +507,6 @@ void redrawAll() {
 void drawWallpaper() {
 	Fill(0,1,30,26,wallpaperTile); // draw background
 }
-
-/*void saveVram() {
-	for (int i=0; i<VRAM_TILES_V * VRAM_TILES_H; i++) { // save current screen to the "framebuffer" in spiram
-		SpiRamWriteU8(0,i,vram[i]);
-	}
-}
-
-void restoreVram() {
-	for (int i=0; i<VRAM_TILES_V * VRAM_TILES_H; i++) { // restore saved "framebuffer" from spiram
-		vram[i] = SpiRamReadU8(0,i);
-	}
-}*/
 
 void printWindow(int x, int y, int windowNumber, unsigned char *text) { // mostly copied from the Uzebox kernel source
 	int i;
@@ -565,24 +531,18 @@ void printWindowInt(int x, int y, int windowNumber, unsigned int val) { // mostl
 		if (val>0 || i==0) {
 			if (fontColor == whitebg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+c+16);
 			if (fontColor == blackbg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+c+16);
-		} else {
-			//if (fontColor == whitebg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+0);
-			//if (fontColor == blackbg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+0);
 		}
 		val = val/10;
 	}
 }
 
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile) {
-	//if (getActiveWindow() != 0) SpiRamWriteU8(1,((y*window[windowNumber].sizeY)+x)+(windowNumber*(24*29)),tile);
 	if (getActiveWindow() != 0) SpiRamWriteU8(1,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),tile);
-	//PrintInt(20,25,((y*window[windowNumber].sizeY)+x)*windowNumber,false);
 }
 
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, unsigned char *text, unsigned int callbackFunc, int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
 	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in bank 0. this will contain 0 for no button, and any other value for the button number
 		for (int y=locationY; y<locationY+sizeY; y++) { // ^ if you need to see the button map for whatever reason, in updateActiveWindow() change it to SetTile from bank 0, this will draw the button map in the window
-			//SpiRamWriteU8(0,((y*window[windowNumber].sizeY)+x)+(windowNumber*(24*29)),buttonNumber);
 			SpiRamWriteU8(0,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),buttonNumber);
 		}
 	}
@@ -596,13 +556,11 @@ void createButton(int locationX, int locationY, int sizeX, int sizeY, int window
 }
 
 void updateButtonClicks() {
-	int buttonNumber = 0; // this will contain the button number that was clicked
-	//buttonNumber = SpiRamReadU8(0,(((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeY)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)));
-	buttonNumber = SpiRamReadU8(0,(((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)));
-	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is between 1 and 99, works around a bug on real hardware that i haven't figured out yet ;~;
-		window[getActiveWindow()].clickX = 300; // reset back to default value
+	int buttonNumber = SpiRamReadU8(0,(((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29))); // this will contain the button number that was clicked
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
+		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
 		window[getActiveWindow()].clickY = 300;
-		(button[buttonNumber].callback)(button[buttonNumber].callbackIntArg);
+		(button[buttonNumber].callback)(button[buttonNumber].callbackIntArg); // call the function assigned to this button
 	}
 }
 
@@ -631,13 +589,13 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 	window[newWindowNum].clickY = 300;
 	window[newWindowNum].dragging = false;
 
-	clearWindow(newWindowNum,3);
+	clearWindow(newWindowNum,3); // fill new window with white tiles, also clears the button map for this window
 
 	setActiveWindow(newWindowNum);
 }
 
 void destroyWindow(int windowNumber) {
-	SetTile(window[windowNumber].x, window[windowNumber].y-1, 15);
+	SetTile(window[windowNumber].x, window[windowNumber].y-1, 15); // draw X in the close button
 	WaitVsync(3);
 	window[getActiveWindow()].created = false;
 	for (int i=0; i<10; i++) {
@@ -662,13 +620,11 @@ void destroyWindow(int windowNumber) {
 void clearWindow(int windowNumber, int tile) {
 	for (int x=window[windowNumber].x; x<window[windowNumber].sizeX+window[windowNumber].x; x++) {
 		for (int y=window[windowNumber].y; y<window[windowNumber].sizeY+window[windowNumber].y; y++) {
-			//SpiRamWriteU8(1,(((y-window[windowNumber].y)*window[windowNumber].sizeY)+(x-window[windowNumber].x))+(windowNumber*(24*29)),tile);
 			SpiRamWriteU8(1,(((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)),tile); // set window background to tile
 		}
 	}
 	for (int x=window[windowNumber].x; x<window[windowNumber].sizeX+window[windowNumber].x; x++) {
 		for (int y=window[windowNumber].y; y<window[windowNumber].sizeY+window[windowNumber].y; y++) {
-			//SpiRamWriteU8(0,(((y-window[windowNumber].y)*window[windowNumber].sizeY)+(x-window[windowNumber].x))+(windowNumber*(24*29)),0);
 			SpiRamWriteU8(0,(((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)),0); // clear button map
 		}
 	}
@@ -688,7 +644,7 @@ void initialize() {
 	SetSpritesTileTable(spriteset);
 	setFontColor(whitebg);
 
-	sprites[0].tileIndex = 5; // temp, probably lol
+	sprites[0].tileIndex = 5;
 
 	if (EepromReadBlock(48879,&ebs) != 0) {
 		ebs.data[0] = 1; // byte 0 is the wallpaper tile
@@ -738,14 +694,9 @@ void initialize() {
 
 int main() {
 	ebs.id = 48879;
-	//ebs.data[0] = 255;
-	//EepromWriteBlock(&ebs);
-
 	initialize();
 
 	EnableSnesMouse(0,cursor_map);
-
-	//saveVram();
 
 	while(1) { // main loop
 		updateController();
@@ -760,14 +711,6 @@ int main() {
 
 		updateButtonClicks();
 
-		/*setFontColor(whitebg);
-		PrintInt(11,9,menu.selectedMenu,false);
-		Print(5,9,PSTR("Menu:"));
-		PrintInt(14,10,menu.clickedMenuItem,false);
-		Print(5,10,PSTR("Clicked:"));
-		PrintInt(15,11,menu.selectedMenuItem,false);
-		Print(5,11,PSTR("Hovering:"));*/
-
 		WaitVsync(1);
 	}
 }
@@ -776,18 +719,11 @@ int main() {
 
 void createAboutWindow() {
 	createWindow(5,5,10,9,"About",5);
-	//createWindow(0,2,30,25,"About",5);
-	clearWindow(getActiveWindow(),0);
-	//setWindowTile(0,0,1,1);
-	//setFontColor(whitebg);
-	//printWindow(1,1,getActiveWindow(),"Test!");
-	//setFontColor(blackbg);
-	//createButton(1,2,3,1,1,1,"123",nextWallpaper);
+	clearWindow(getActiveWindow(),0); // fill window with black tiles (tile 0)
 
 	for (int x=3; x<8; x++) {
 		for (int y=1; y<5; y++) {
-			setWindowTile(x,y,getActiveWindow(),23+((y-3)*5)+x);
-			//setWindowTile(x,y,getActiveWindow(),x+y);
+			setWindowTile(x,y,getActiveWindow(),23+((y-3)*5)+x); // draw Uzebox logo
 		}
 	}
 
@@ -800,12 +736,6 @@ void createAboutWindow() {
 
 void createTilesWindow() {
 	createWindow(5,5,11,10,"Tile Info",9);
-	//clearWindow(getActiveWindow(),0);
-	//setWindowTile(0,0,1,1);
-	//setFontColor(whitebg);
-	//printWindow(1,1,getActiveWindow(),"Test!");
-	//setFontColor(blackbg);
-	//createButton(1,2,3,1,1,1,"123",nextWallpaper);
 
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Total");
@@ -834,9 +764,6 @@ void settingsSaveWallpaper() {
 
 void createSettingsWindow() {
 	createWindow(5,5,16,5,"Settings",8);
-	//clearWindow(getActiveWindow(),0);
-	//setWindowTile(0,0,1,1);
-	//setFontColor(whitebg);
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Wallpaper");
 
