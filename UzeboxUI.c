@@ -131,6 +131,33 @@ struct Menu {
 	int clickedMenuItem; // the menu item that was clicked
 } menu;
 
+void updateCursor();
+void updateControllers();
+void setFontColor(int font);
+void updateMenubar();
+void updateClicks();
+void handleMenuClicks();
+void updateActiveWindow();
+void updateInactiveTitlebars();
+void redrawAll();
+void drawWallpaper();
+void printWindow(int x, int y, int windowNumber, unsigned char *text);
+void printWindowInt(int x, int y, int windowNumber, unsigned int val);
+void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
+void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, unsigned char *text, unsigned int callbackFunc, int callbackArg1);
+void updateButtonClicks();
+void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize);
+void destroyWindow(int windowNumber);
+void clearWindow(int windowNumber, int tile);
+void setActiveWindow(int windowNumber);
+int getActiveWindow();
+void initialize();
+void createAboutWindow();
+void createTilesWindow();
+void settingsChangeWallpaper(int num);
+void settingsSaveWallpaper();
+void createSettingsWindow();
+
 void updateCursor() {
 	//MoveSprite(0,cursor.x,cursor.y,2,2); // 16x16, good looking but too big
 	sprites[0].x = cursor.x;
