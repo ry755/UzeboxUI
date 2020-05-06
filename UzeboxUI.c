@@ -762,7 +762,7 @@ void createAboutWindow() {
 // Tiles window (tile info)
 
 void createTilesWindow() {
-	createWindow(5,5,11,10,"Tile Info",9);
+	createWindow(5,5,11,13,"Tile Info",9);
 
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Total");
@@ -772,6 +772,9 @@ void createTilesWindow() {
 
 	printWindow(1,5,getActiveWindow(),"RAM Tiles");
 	printWindowInt(2,7,getActiveWindow(),RAM_TILES_COUNT);
+
+	printWindow(1,9,getActiveWindow(),"Fonts");
+	printWindowInt(4,11,getActiveWindow(),FONT_SIZE+FONT_INVERT_SIZE);
 }
 
 // Settings window
