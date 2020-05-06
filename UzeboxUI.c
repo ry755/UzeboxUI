@@ -495,6 +495,22 @@ void updateActiveWindow() {
 			}
 			window[getActiveWindow()].x = (cursor.x/8)-(window[getActiveWindow()].sizeX/2);
 			window[getActiveWindow()].y = (cursor.y/8)+1;
+
+			if (window[getActiveWindow()].y < 2) {
+				window[getActiveWindow()].y = 2; // don't allow window to go on top of menubar
+			}
+
+			if (window[getActiveWindow()].y+window[getActiveWindow()].sizeY > 27) {
+				window[getActiveWindow()].y = 27-window[getActiveWindow()].sizeY; // don't allow window to go past the bottom of the screen
+			}
+
+			if (window[getActiveWindow()].x < 0) {
+				window[getActiveWindow()].x = 0; // don't allow window to go past left side of the screen
+			}
+
+			if (window[getActiveWindow()].x+window[getActiveWindow()].sizeX > 30) {
+				window[getActiveWindow()].x = 30-window[getActiveWindow()].sizeX; // don't allow window to go past right side of the screen
+			}
 		}
 
 		for (int x=window[getActiveWindow()].x; x<window[getActiveWindow()].sizeX+window[getActiveWindow()].x; x++) {
