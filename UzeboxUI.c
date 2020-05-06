@@ -241,7 +241,6 @@ void setFontColor(int font) {
 
 void updateMenubar() {
 	setFontColor(whitebg);
-	PrintInt(28,0,getActiveWindow(),false);
 
 	if (menu.open && menu.selectedMenu == 1) { // Uze menu
 		SetTile(1,0,6);
