@@ -101,18 +101,18 @@ struct Window {
 	int y;
 	int sizeX;
 	int sizeY;
-	char title[10];
+	unsigned char title[10];
 	int titleSize; // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
 	int clickX;
 	int clickY;
 	int prevX; // used while dragging to prevent the screen constantly being redrawn
 	int prevY; // ^
 	bool dragging;
-} window[10];
+} window[11];
 
 struct Button {
 	bool created;
-	int (*callback)(); // function that gets called when button is clicked
+	void (*callback)(); // function that gets called when button is clicked
 	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
 	int window; // window number that this button lives on
 } button[100];
@@ -135,16 +135,16 @@ void updateCursor();
 void updateControllers();
 void setFontColor(int font);
 void updateMenubar();
-void updateClicks();
+void updateClick();
 void handleMenuClicks();
 void updateActiveWindow();
 void updateInactiveTitlebars();
 void redrawAll();
 void drawWallpaper();
-void printWindow(int x, int y, int windowNumber, unsigned char *text);
+void printWindow(int x, int y, int windowNumber, char *text);
 void printWindowInt(int x, int y, int windowNumber, unsigned int val);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
-void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, unsigned char *text, unsigned int callbackFunc, int callbackArg1);
+void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
 void updateButtonClicks();
 void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize);
 void destroyWindow(int windowNumber);
@@ -535,8 +535,8 @@ void drawWallpaper() {
 	Fill(0,1,30,26,wallpaperTile); // draw background
 }
 
-void printWindow(int x, int y, int windowNumber, unsigned char *text) { // mostly copied from the Uzebox kernel source
-	int i;
+void printWindow(int x, int y, int windowNumber, char *text) { // mostly copied from the Uzebox kernel source
+	int i = 0;
 	char c;
 	while(1) {
 		c = text[i++];
@@ -567,7 +567,7 @@ void setWindowTile(int x, int y, int windowNumber, unsigned int tile) {
 	if (getActiveWindow() != 0) SpiRamWriteU8(1,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),tile);
 }
 
-void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, unsigned char *text, unsigned int callbackFunc, int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
+void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
 	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in bank 0. this will contain 0 for no button, and any other value for the button number
 		for (int y=locationY; y<locationY+sizeY; y++) { // ^ if you need to see the button map for whatever reason, in updateActiveWindow() change it to SetTile from bank 0, this will draw the button map in the window
 			SpiRamWriteU8(0,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),buttonNumber);
@@ -587,38 +587,45 @@ void updateButtonClicks() {
 	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
 		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
 		window[getActiveWindow()].clickY = 300;
-		(button[buttonNumber].callback)(button[buttonNumber].callbackIntArg); // call the function assigned to this button
+		button[buttonNumber].callback(button[buttonNumber].callbackIntArg); // call the function assigned to this button
 	}
 }
 
 void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize) { // locationX and locationY are where the actual window contents start, not the titlebar
-	int newWindowNum; // window number for the window that will be created here
+	int newWindowNum = 1; // window number for the window that will be created here
+	int numberOfUsedSlots = 0;
 
 	for (int i=10; i>0; i--) { // check for an empty window slot, starting from the bottom
 		if (!window[i].created) {
 			newWindowNum = i;
+		} else {
+			numberOfUsedSlots++;
 		}
 	}
 
-	window[newWindowNum].created = true;
+	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
+		window[newWindowNum].created = true;
 
-	window[newWindowNum].x = locationX;
-	window[newWindowNum].y = locationY;
-	window[newWindowNum].prevX = locationX;
-	window[newWindowNum].prevY = locationY;
-	window[newWindowNum].sizeX = sizeX;
-	window[newWindowNum].sizeY = sizeY;
-	for (int i=0; i<titleSize; i++) {
-		window[newWindowNum].title[i] = title[i];
+		window[newWindowNum].x = locationX;
+		window[newWindowNum].y = locationY;
+		window[newWindowNum].prevX = locationX;
+		window[newWindowNum].prevY = locationY;
+		window[newWindowNum].sizeX = sizeX;
+		window[newWindowNum].sizeY = sizeY;
+		for (int i=0; i<titleSize; i++) {
+			window[newWindowNum].title[i] = title[i];
+		}
+		window[newWindowNum].titleSize = titleSize;
+		window[newWindowNum].clickX = 300; // 300 if not clicked anywhere
+		window[newWindowNum].clickY = 300;
+		window[newWindowNum].dragging = false;
+
+		clearWindow(newWindowNum,3); // fill new window with white tiles, also clears the button map for this window
+
+		setActiveWindow(newWindowNum);
+	} else {
+		Print(14,25,PSTR("No empty slots!")); // temp, only until i add a dialog box function
 	}
-	window[newWindowNum].titleSize = titleSize;
-	window[newWindowNum].clickX = 300; // 300 if not clicked anywhere
-	window[newWindowNum].clickY = 300;
-	window[newWindowNum].dragging = false;
-
-	clearWindow(newWindowNum,3); // fill new window with white tiles, also clears the button map for this window
-
-	setActiveWindow(newWindowNum);
 }
 
 void destroyWindow(int windowNumber) {
@@ -800,5 +807,5 @@ void createSettingsWindow() {
 	setWindowTile(3,3,getActiveWindow(),wallpaperTile);
 	createButton(1,3,1,1,getActiveWindow(),1,"<",settingsChangeWallpaper,-1);
 	createButton(5,3,1,1,getActiveWindow(),2,">",settingsChangeWallpaper,1);
-	createButton(7,3,4,1,getActiveWindow(),3,"Save",settingsSaveWallpaper,NULL);
+	createButton(7,3,4,1,getActiveWindow(),3,"Save",settingsSaveWallpaper,0);
 }
