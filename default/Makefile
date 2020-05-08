@@ -14,7 +14,7 @@ UZEBIN_DIR=../bin
 ## Kernel settings
 KERNEL_DIR = ../kernel
 KERNEL_OPTIONS  = -DVIDEO_MODE=3 -DINTRO_LOGO=0 -DSOUND_CHANNEL_4_ENABLE=0 -DSCROLLING=0 -DSOUND_MIXER=1
-KERNEL_OPTIONS += -DMAX_SPRITES=4 -DRAM_TILES_COUNT=4 -DSCREEN_TILES_V=27 -DSNES_MOUSE=1
+KERNEL_OPTIONS += -DMAX_SPRITES=1 -DRAM_TILES_COUNT=4 -DSCREEN_TILES_V=27 -DSNES_MOUSE=1
 #KERNEL_OPTIONS += -DVRAM_TILES_V=32
 
 ## Options common to compile, link and assembly rules
@@ -49,7 +49,7 @@ HEX_FLASH_FLAGS = -R .eeprom
 
 ## Objects that must be built in order to link
 #OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o spiram.o sdBase.o bootlib.o $(GAME).o
-OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o bootlib.o spiram.o $(GAME).o
+OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o bootlib.o spiram.o avr_op_decoder.o avrvm.o $(GAME).o
 
 ## Objects explicitly added by the user
 LINKONLYOBJECTS = 
@@ -84,6 +84,12 @@ bootlib.o: $(KERNEL_DIR)/bootlib.s $(DIRS)
 spiram.o: $(KERNEL_DIR)/spiram.s $(DIRS)
 	$(CC) $(INCLUDES) $(ASMFLAGS) -c $< -o $@
 
+avr_op_decoder.o: ../avrvm/avr_op_decoder.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
+avrvm.o: ../avrvm/avrvm.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
 ## Compile game sources
 $(GAME).o: ../$(GAME).c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
@@ -117,14 +123,15 @@ $(TARGET): $(OBJECTS)
 	-$(UZEBIN_DIR)/packrom $(GAME).hex $@ $(INFO)
 
 UNAME := $(shell sh -c 'uname -s 2>/dev/null || echo not')
-AVRSIZEFLAGS := -A ${TARGET}
-ifneq (,$(findstring MINGW,$(UNAME)))
+#AVRSIZEFLAGS := -A ${TARGET}
+#ifneq (,$(findstring MINGW,$(UNAME)))
+#AVRSIZEFLAGS := -C --mcu=${MCU} ${TARGET}
+#endif
+
 AVRSIZEFLAGS := -C --mcu=${MCU} ${TARGET}
-endif
 
 size: ${TARGET}
-	@echo
-	@avr-size ${AVRSIZEFLAGS}
+	avr-size ${AVRSIZEFLAGS}
 
 ## Clean target
 .PHONY: clean flash read_flash emu

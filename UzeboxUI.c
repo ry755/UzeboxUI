@@ -29,6 +29,8 @@
 #include <spiram.h>
 #include <bootlib.h>
 
+#include "avrvm/avrvm.h"
+
 #include "data/tileset.inc"
 #include "data/spriteset.inc"
 #include "data/font-8x8-full.inc"
@@ -44,26 +46,141 @@ int wallpaperTile = 1; // default wallpaper tile is 1
 
 struct EepromBlockStruct ebs;
 
+int activeWindow = 0; // keeps track of the window number that's currently active and being updated
+
+int fontColor = 0;
+#define whitebg 0
+#define blackbg 1
+
+// avrvm /////////////////////////////////////////////////////////////////
+
+static avrvm_ctx_t vm;
+bool runVM = false;
+//static uint8_t sram[1024 + 160];
+static uint8_t io[61];
+
+static uint16_t flash_reader(uint16_t word_idx) { // TODO: IMPORTANT: this must read the opcodes from spiram bank 0
+    // wrap at 4k words to simulate behavior of atmega88 with 8k flash
+    word_idx &= 0x0FFF;
+    /*if (fseek(src, word_idx * 2, SEEK_SET) != 0) {
+        printf("failed to seek");
+        exit(-1);
+    }
+
+    uint16_t opcode;
+    if (fread(&opcode, 2, 1, src) != 1) {
+        printf("failed to read");
+        exit(-1);
+    }*/
+
+	//uint8_t high = SpiRamReadU8(0,word_idx*2);
+	//uint8_t low = SpiRamReadU8(0,(word_idx*2)+1);
+
+	//uint16_t opcode = low | uint16_t (high) << 8;
+	//uint16_t opcode = SpiRamReadU8(0,word_idx*2);
+	uint16_t opcode = SpiRamReadU8(0,(word_idx*2)+1);
+	opcode = opcode << 8;
+	opcode |= SpiRamReadU8(0,word_idx*2);
+
+    return opcode;
+}
+
+static uint8_t sram_reader(uint16_t addr) {
+    //return sram[addr];
+	return SpiRamReadU8(0,addr+32768); // sram is in the upper 32k of bank 0
+}
+
+static void sram_writer(uint16_t addr, uint8_t byte) {
+    //sram[addr] = byte;
+	SpiRamWriteU8(0,addr+32768,byte); // sram is in the upper 32k of bank 0
+}
+
+static uint8_t io_reader(uint8_t addr) {
+    return io[addr];
+}
+
+static void io_writer(uint8_t addr, uint8_t byte) {
+    io[addr] = byte;
+}
+
+static void exec_ext_call(int idx) {
+    switch (idx) {
+    	case 0: { // createWindow
+        	int x = 0;
+			int y = 0;
+			int sizeX = 0;
+			int sizeY = 0;
+			char title[10] = "         ";
+			int titleSize = 0;
+
+			avrvm_unpack_args_gcc(&vm,"bbbbb",&x,&y,&sizeX,&sizeY,&titleSize);
+			for (int i=0; i<sizeof(title); i++) {
+				title[i] = io_reader(i);
+			}
+			createWindow(x,y,sizeX,sizeY,title,titleSize);
+			
+			Print(1,2,PSTR("Debug"));
+			PrintInt(5,3,x,false);
+			PrintInt(5,4,y,false);
+			PrintInt(5,5,sizeX,false);
+			PrintInt(5,6,sizeY,false);
+			for (int i=0; i<titleSize; i++) {
+				PrintChar(1+i,7,title[i]);
+			}
+			PrintInt(5,8,titleSize,false);
+			//PrintRam(6,7,title);
+            //printf("%c", c);
+        }
+        break;
+
+    	case 1: { // printWindow
+			int x = 0;
+			int y = 0;
+			int windowNumber = 1;
+			char text[61];
+			int textSize = 0;
+
+			avrvm_unpack_args_gcc(&vm,"bbbb",&x,&y,&windowNumber,&textSize);
+            for (int i=0; i<textSize; i++) {
+				text[i] = io_reader(i);
+			}
+			for (int i=0; i<textSize; i++) {
+				PrintChar(1+i,10,text[i]);
+			}
+			printWindowLen(x,y,windowNumber,text,textSize);
+        }
+        break;
+
+    	case 2: { // getActiveWindow
+            avrvm_pack_return_gcc(&vm, 'b', &activeWindow);
+        }
+        break;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 // Menu //////////////////////////////////////////////////////////////////
 
-const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
+const char __flash uzeMenu[][55] = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
 	"About     ",
 	"Settings  ",
 	"Tiles     ",
+	"AVRVM Test",
 	"Reset     "
 };
 
-const char fileMenu[][22] PROGMEM = {
+const char __flash fileMenu[][22] = {
 	"New File  ",
 	"Open File "
 };
 
-const char editMenu[][22] PROGMEM = {
+const char __flash editMenu[][22] = {
 	"Copy      ",
 	"Paste     "
 };
 
-const char windowMenu[][154] PROGMEM = {
+const char __flash windowMenu[][154] = {
 	"             1",
 	"             2",
 	"             3",
@@ -84,16 +201,10 @@ const char windowMenu[][154] PROGMEM = {
 	3,4
 };*/
 
-const char cursor_map[] PROGMEM = {
+const char __flash cursor_map[] = {
 	1,2, // width/height of map
 	1 // tile indexes
 };
-
-int activeWindow = 0; // keeps track of the window number that's currently active and being updated
-
-int fontColor;
-#define whitebg 0
-#define blackbg 1
 
 struct Window {
 	bool created;
@@ -115,7 +226,7 @@ struct Button {
 	void (*callback)(); // function that gets called when button is clicked
 	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
 	int window; // window number that this button lives on
-} button[100];
+} button[50];
 
 struct Cursor {
 	int x;
@@ -142,6 +253,7 @@ void updateInactiveTitlebars();
 void redrawAll();
 void drawWallpaper();
 void printWindow(int x, int y, int windowNumber, char *text);
+void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
 void printWindowInt(int x, int y, int windowNumber, unsigned int val);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
@@ -450,7 +562,15 @@ void handleMenuClick() {
 			redrawAll();
 			createTilesWindow();
 		}
-		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 4) { // clicked the quit option
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 4) { // clicked the test option
+			menu.clickedMenuItem = 0;
+			menu.selectedMenu = 0;
+			menu.selectedMenuItem = 0;
+			drawWallpaper();
+			redrawAll();
+			runVM = true;
+		}
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 5) { // clicked the quit option
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -565,6 +685,19 @@ void printWindow(int x, int y, int windowNumber, char *text) { // mostly copied 
 	}
 }
 
+void printWindowLen(int x, int y, int windowNumber, char *text, int textSize) {
+	int i = 0;
+	char c;
+	for (int num=0; num<textSize; num++) {
+		c = text[i++];
+		if (c != 0) {
+			c = ((c&127)-32);
+			if (fontColor == whitebg) setWindowTile(x++,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+c);
+			if (fontColor == blackbg) setWindowTile(x++,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+c);
+		}
+	}
+}
+
 void printWindowInt(int x, int y, int windowNumber, unsigned int val) { // mostly copied from the Uzebox kernel source
 	unsigned char c,i;
 
@@ -583,9 +716,9 @@ void setWindowTile(int x, int y, int windowNumber, unsigned int tile) {
 }
 
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
-	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in bank 0. this will contain 0 for no button, and any other value for the button number
-		for (int y=locationY; y<locationY+sizeY; y++) { // ^ if you need to see the button map for whatever reason, in updateActiveWindow() change it to SetTile from bank 0, this will draw the button map in the window
-			SpiRamWriteU8(0,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),buttonNumber);
+	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in the upper 32kb of bank 1
+		for (int y=locationY; y<locationY+sizeY; y++) { // ^ to see the button map, add 32768 to the location where the window tiles are read from
+			SpiRamWriteU8(1,(((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)))+32768,buttonNumber);
 		}
 	}
 
@@ -598,8 +731,8 @@ void createButton(int locationX, int locationY, int sizeX, int sizeY, int window
 }
 
 void updateButtonClicks() {
-	int buttonNumber = SpiRamReadU8(0,(((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29))); // this will contain the button number that was clicked
-	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
+	int buttonNumber = SpiRamReadU8(1,((((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)))+32768); // this will contain the button number that was clicked
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 50 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
 		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
 		window[getActiveWindow()].clickY = 300;
 		button[buttonNumber].callback(button[buttonNumber].callbackIntArg); // call the function assigned to this button
@@ -651,7 +784,7 @@ void destroyWindow(int windowNumber) {
 		window[getActiveWindow()].title[i] = 0;
 	}
 
-	for (int buttonNum=0; buttonNum<100; buttonNum++) { // remove any buttons that may have been on this window
+	for (int buttonNum=0; buttonNum<50; buttonNum++) { // remove any buttons that may have been on this window
 		if (button[buttonNum].created && button[buttonNum].window == windowNumber) {
 			button[buttonNum].created = false;
 			button[buttonNum].window = 0;
@@ -674,7 +807,7 @@ void clearWindow(int windowNumber, int tile) {
 	}
 	for (int x=window[windowNumber].x; x<window[windowNumber].sizeX+window[windowNumber].x; x++) {
 		for (int y=window[windowNumber].y; y<window[windowNumber].sizeY+window[windowNumber].y; y++) {
-			SpiRamWriteU8(0,(((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)),0); // clear button map
+			SpiRamWriteU8(1,((((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)))+32768,0); // clear button map
 		}
 	}
 }
@@ -722,16 +855,7 @@ void initialize() {
 	menu.selectedMenuItem = 0;
 	menu.clickedMenuItem = 0;
 
-	/*SetRenderingParameters(20,8); // only render first line, speeds up clearing spiram
-	for (unsigned int i=0; i<60000; i++) { // clear spiram
-		SpiRamWriteU8(0,i,0);
-		SpiRamWriteU8(1,i,0);
-		PrintInt(8,0,i,false);
-	}
-	SetRenderingParameters(20,216);
-	Fill(1,0,28,1,3);*/
-
-	for (int i=0; i<100; i++) {
+	for (int i=0; i<50; i++) {
 		button[i].created = false; // no buttons are created yet, so set all to false
 	}
 
@@ -745,7 +869,60 @@ int main() {
 	ebs.id = 48879;
 	initialize();
 
-	EnableSnesMouse(0,cursor_map);
+	// sd card stuff
+	u8  pos;
+	u8  res;
+	sdc_struct_t sd_struct;
+	u8  buf[512];
+	u32 t32;
+	sd_struct.bufp = &(buf[0]);
+
+	res = FS_Init(&sd_struct);
+	if (res != 0U) {
+		Print(3,0,PSTR("No SD Card!"));
+		PrintChar(36U, 3U, res + '0');
+		while(1);
+	}
+
+	t32 = FS_Find(&sd_struct, // look for avrvmtst.bin
+	    ((u16)('A') << 8) |
+	    ((u16)('V')     ),
+	    ((u16)('R') << 8) |
+	    ((u16)('V')     ),
+	    ((u16)('M') << 8) |
+	    ((u16)('T')     ),
+	    ((u16)('S') << 8) |
+	    ((u16)('T')     ),
+	    ((u16)('B') << 8) |
+	    ((u16)('I')     ),
+	    ((u16)('N') << 8) |
+	    ((u16)(0)       ));
+
+	if (t32 == 0U){
+		Print(3,0,PSTR("No file!"));
+		while(1);
+	}
+
+	FS_Select_Cluster(&sd_struct, t32);
+	FS_Read_Sector(&sd_struct); // read from file
+
+	for (int i=0; i<512; i++) {
+		SpiRamWriteU8(0,i,buf[i]); // read data from file into bank 0
+	}
+
+	// avrvm stuff
+	avrvm_iface_t iface = {
+        .flash_r = flash_reader,
+        .sram_r = sram_reader,
+        .sram_w = sram_writer,
+        .io_r = io_reader,
+        .io_w = io_writer,
+    };
+
+    //avrvm_init(&vm, &iface, sizeof(sram));
+	avrvm_init(&vm,&iface,1024+160);
+
+	//EnableSnesMouse(0,cursor_map);
 
 	while(1) { // main loop
 		updateController();
@@ -759,6 +936,28 @@ int main() {
 		updateMenubar();
 
 		updateButtonClicks();
+
+		// handle avrvm functions
+		if (runVM) {
+			int rc = avrvm_exec(&vm); // execute one vm instruction
+        	if (rc == AVRVM_RC_OK) continue;
+
+        	if (rc >= 0) {
+	            exec_ext_call(rc);
+        	} else if (rc == AVRVM_RC_UNDEF_INSTR) {
+	        	//printf("bad instruction");
+        		//return -1;
+				Print(1,25,PSTR("invalid instruction"));
+        	} else if (rc == AVRVM_RC_BREAK) {
+	        	//printf("end of script");
+        		//return 0;
+				runVM = false;
+				Print(1,25,PSTR("break"));
+        	} else if (rc == AVRVM_RC_SLEEP) {
+	        	//printf("sleep request");
+				WaitVsync(1);
+        	}
+		}
 
 		WaitVsync(1);
 	}
