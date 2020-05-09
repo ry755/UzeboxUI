@@ -29,14 +29,37 @@ static const char * const strs[] = {
 void main(void) {
     register unsigned char i;
 
+    volatile char *ptr;
+    volatile char c;
+
     i = 6; do {
-        *((char *) IO_BASE + i) = strs[0][i];
+        // *((char *) IO_BASE + i) = strs[0][i];
+
+        // r = strs[0][i]
+        ptr = (char *) strs[0]; c = ptr[i];
+
+        // y = (char *) IO_BASE + i
+        ptr = (char *) IO_BASE + i;
+
+        // *y = r
+        asm volatile("st %a0, %1" : "=e" (ptr), "=r" (c) :);
+
     } while (i != 0);
 
     hostapi_createWindow(7,21, 20,3, 6);
 
     i = 8; do {
-        *((char *) IO_BASE + i) = strs[1][i];
+        // *((char *) IO_BASE + i) = strs[1][i];
+
+        // r = strs[1][i]
+        ptr = (char *) strs[1]; c = ptr[i];
+
+        // y = (char *) IO_BASE + i
+        ptr = (char *) IO_BASE + i;
+
+        // *y = r
+        asm volatile("st %a0, %1" : "=e" (ptr), "=r" (c) :);
+
     } while (i != 0);
 
     hostapi_printWindowLen(1,1, hostapi_getActiveWindow(), 8);
