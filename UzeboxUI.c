@@ -767,7 +767,7 @@ int main() {
 // About window
 
 void createAboutWindow() {
-	createWindow(5,5,10,9,"About",5);
+	createWindow(5,5,10,10,"About",5);
 	clearWindow(getActiveWindow(),0); // fill window with black tiles (tile 0)
 
 	for (int x=3; x<8; x++) {
@@ -779,6 +779,7 @@ void createAboutWindow() {
 	setFontColor(blackbg);
 	printWindow(1,6,getActiveWindow(),"UzeboxUI");
 	printWindow(1,7,getActiveWindow(),"by ry755");
+	printWindow(1,8,getActiveWindow(),"& luawtf");
 }
 
 // Tiles window (tile info)
