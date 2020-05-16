@@ -31,9 +31,10 @@
 
 #include "data/tileset.inc"
 #include "data/spriteset.inc"
-#include "data/font-8x8-full.inc"
-#include "data/font-8x8-full-invert.inc"
-//#include "data/cbios-font-white.inc"
+//#include "data/fonts/font-8x8-full.inc"
+//#include "data/fonts/font-8x8-full-invert.inc"
+#include "data/fonts/envious-blackbg.inc"
+#include "data/fonts/envious-whitebg.inc"
 
 int btnHeld = 0;		// buttons held right now
 int btnPressed = 0;		// buttons pressed this frame

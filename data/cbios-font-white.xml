@@ -1,9 +1,0 @@
-<?xml version="1.0" ?>
-<gfx-xform version="1">
-
-	<input file="../data/cbios-font-white.png" type="png" tile-width="8" tile-height="8" />
-	<output file="../data/cbios-font-white.inc">
-		<tiles var-name="font_invert"/>
-	</output>
- 
-</gfx-xform>

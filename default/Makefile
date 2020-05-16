@@ -58,7 +58,7 @@ LINKONLYOBJECTS =
 INCLUDES = -I"$(KERNEL_DIR)" 
 
 ## Build
-all: ../data/tileset.inc ../data/spriteset.inc ../data/font-8x8-full-invert.inc ../data/cbios-font-white.inc $(TARGET) $(GAME).hex $(GAME).eep $(GAME).lss $(GAME).uze size
+all: ../data/tileset.inc ../data/spriteset.inc enviousfonts $(TARGET) $(GAME).hex $(GAME).eep $(GAME).lss $(GAME).uze size
 
 ## Rebuild graphics ressource
 
@@ -98,11 +98,9 @@ $(TARGET): $(OBJECTS)
 ../data/spriteset.inc: ../data/spriteset.png ../data/spriteset.xml
 	$(UZEBIN_DIR)/gconvert ../data/spriteset.xml
 
-../data/font-8x8-full-invert.inc: ../data/font-8x8-full-invert.png ../data/font-8x8-full-invert.xml
-	$(UZEBIN_DIR)/gconvert ../data/font-8x8-full-invert.xml
-
-../data/cbios-font-white.inc: ../data/cbios-font-white.png ../data/cbios-font-white.xml
-	$(UZEBIN_DIR)/gconvert ../data/cbios-font-white.xml
+enviousfonts: ../data/fonts/envious-blackbg.png ../data/fonts/envious-whitebg.png ../data/fonts/envious-blackbg.xml ../data/fonts/envious-whitebg.xml
+	$(UZEBIN_DIR)/gconvert ../data/fonts/envious-blackbg.xml
+	$(UZEBIN_DIR)/gconvert ../data/fonts/envious-whitebg.xml
 
 %.hex: $(TARGET)
 	avr-objcopy -O ihex $(HEX_FLASH_FLAGS)  $< $@
