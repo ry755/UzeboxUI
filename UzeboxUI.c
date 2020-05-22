@@ -639,6 +639,29 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 		clearWindow(newWindowNum,3); // fill new window with white tiles, also clears the button map for this window
 		setActiveWindow(newWindowNum);
 
+		// find the center point of the window
+		int centerX = (locationX + (locationX + sizeX)) / 2;
+		int centerY = (locationY + (locationY + sizeY)) / 2;
+
+		int animSizeX = 0;
+		int animSizeY = 0;
+
+		for (int x=centerX; x<locationX+sizeX; x++) { // this animation is very poorly written, and it's not always 100% accurate
+			for (int y=centerY; y<locationY+sizeY; y++) { // however, the animation plays so fast that it looks good enough
+				Fill(centerX-animSizeX,centerY-animSizeY,animSizeX,animSizeY,8);
+				Fill(centerX-animSizeX,centerY,animSizeX,animSizeY,8);
+				Fill(centerX,centerY-animSizeY,animSizeX,animSizeY,8);
+				Fill(centerX,centerY,animSizeX,animSizeY,8);
+			}
+			WaitVsync(1);
+			if (animSizeX < (((centerX + (sizeX/2)) - locationX)) - 1) {
+				animSizeX++;
+			}
+			if (animSizeY < (((centerY + (sizeY/2)) - locationY)) - 1) {
+				animSizeY++;
+			}
+		}
+
 		// ensure windows are updated on screen, in case multiple windows are created before the main loop continues running
 		redrawAll();
 	} else {
