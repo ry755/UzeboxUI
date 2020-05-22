@@ -637,8 +637,10 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 		window[newWindowNum].dragging = false;
 
 		clearWindow(newWindowNum,3); // fill new window with white tiles, also clears the button map for this window
-
 		setActiveWindow(newWindowNum);
+
+		// ensure windows are updated on screen, in case multiple windows are created before the main loop continues running
+		redrawAll();
 	} else {
 		Print(14,25,PSTR("No empty slots!")); // temp, only until i add a dialog box function
 	}
