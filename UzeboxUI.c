@@ -47,6 +47,35 @@ int wallpaperTile = 1; // default wallpaper tile is 1
 
 struct EepromBlockStruct ebs;
 
+void updateCursor();
+void updateControllers();
+void setFontColor(int font);
+void updateMenubar();
+void updateClick();
+void handleMenuClicks();
+void updateActiveWindow();
+void updateInactiveTitlebars();
+void redrawAll();
+void drawWallpaper();
+void printWindow(int x, int y, int windowNumber, char *text);
+void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
+void printWindowInt(int x, int y, int windowNumber, unsigned int val);
+void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
+void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
+void updateButtonClicks();
+void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize);
+void destroyWindow(int windowNumber);
+void clearWindow(int windowNumber, int tile);
+void setActiveWindow(int windowNumber);
+int getActiveWindow();
+void initialize();
+void VMtest();
+void createAboutWindow();
+void createTilesWindow();
+void settingsChangeWallpaper(int num);
+void settingsSaveWallpaper();
+void createSettingsWindow();
+
 // Menu //////////////////////////////////////////////////////////////////
 
 const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
@@ -166,6 +195,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		setWindowTile(locationX,locationY,windowNumber,tile);
 		return 0;
 	}
+	return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -222,35 +252,6 @@ struct Menu {
 	int selectedMenuItem; // menu item that's currently being hovered over
 	int clickedMenuItem; // the menu item that was clicked
 } menu;
-
-void updateCursor();
-void updateControllers();
-void setFontColor(int font);
-void updateMenubar();
-void updateClick();
-void handleMenuClicks();
-void updateActiveWindow();
-void updateInactiveTitlebars();
-void redrawAll();
-void drawWallpaper();
-void printWindow(int x, int y, int windowNumber, char *text);
-void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
-void printWindowInt(int x, int y, int windowNumber, unsigned int val);
-void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
-void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
-void updateButtonClicks();
-void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize);
-void destroyWindow(int windowNumber);
-void clearWindow(int windowNumber, int tile);
-void setActiveWindow(int windowNumber);
-int getActiveWindow();
-void initialize();
-void VMtest();
-void createAboutWindow();
-void createTilesWindow();
-void settingsChangeWallpaper(int num);
-void settingsSaveWallpaper();
-void createSettingsWindow();
 
 void updateCursor() {
 	//MoveSprite(0,cursor.x,cursor.y,2,2); // 16x16, good looking but too big
@@ -886,7 +887,6 @@ int main() {
 	initialize();
 
 	// sd card stuff
-	u8  pos;
 	u8  res;
 	sdc_struct_t sd_struct;
 	u8  buf[512];
