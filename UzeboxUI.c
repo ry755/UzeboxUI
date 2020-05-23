@@ -29,6 +29,8 @@
 #include <spiram.h>
 #include <bootlib.h>
 
+#include "embedvm/vmsrc/embedvm.h"
+
 #include "data/tileset.inc"
 #include "data/spriteset.inc"
 //#include "data/fonts/font-8x8-full.inc"
@@ -51,7 +53,8 @@ const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null termi
 	"About     ",
 	"Settings  ",
 	"Tiles     ",
-	"Reset     "
+	"Reset     ",
+	"Test      "
 };
 
 const char fileMenu[][22] PROGMEM = {
@@ -76,6 +79,96 @@ const char windowMenu[][154] PROGMEM = {
 	"             9",
 	"            10",
 };
+
+//////////////////////////////////////////////////////////////////////////
+
+// EmbedVM ///////////////////////////////////////////////////////////////
+
+struct embedvm_s vm = { };
+
+bool vmRunning = false;
+
+// TODO: hard-coding these values probably isn't the best idea...
+#define EMBEDVM_SYM_main 0x0054
+#define EMBEDVM_SECT_SRAM_BEGIN 0x0000
+#define EMBEDVM_SECT_SRAM_END 0xffff
+
+int16_t mem_read(uint16_t addr, bool is16bit, void *ctx) {
+	if (addr + (is16bit ? 1 : 0) >= 32768) {
+		return 0;
+	}
+	if (is16bit) {
+		return (SpiRamReadU8(0,addr) << 8) | SpiRamReadU8(0,addr+1);
+	}
+	return SpiRamReadU8(0,addr);
+}
+
+void mem_write(uint16_t addr, int16_t value, bool is16bit, void *ctx) {
+	if (addr + (is16bit ? 1 : 0) >= 32768) {
+		return;
+	}
+	if (is16bit) {
+		SpiRamWriteU8(0,addr,value >> 8);
+		SpiRamWriteU8(0,addr+1,value);
+	} else {
+		SpiRamWriteU8(0,addr,value);
+	}
+}
+
+char tempChar[64];
+int tempInt = 0;
+
+int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
+	if (funcid == 0) { // build up a string one character at a time. yes this is weird, but it's the only way that would work
+		if (argc == 0) {
+			tempChar[0] = '\0';
+			tempInt = 0;
+		} else {
+			if (argv[0] != 0) {
+				tempChar[tempInt] = argv[0];
+				tempInt++;
+			}
+		}
+		return 0;
+	}
+	if (funcid == 1) { // create a window
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int sizeX = argv[2];
+		int sizeY = argv[3];
+		int titleSize = argv[4];
+
+		createWindow(locationX,locationY,sizeX,sizeY,tempChar,titleSize);
+		return 0;
+	}
+	if (funcid == 2) { // print in a window
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int windowNumber = argv[2];
+		int textSize = argv[3];
+
+		printWindowLen(locationX,locationY,windowNumber,tempChar,textSize);
+		return 0;
+	}
+	if (funcid == 3) { // return current active window number
+		return getActiveWindow();
+	}
+	if (funcid == 4) { // clear window
+		int windowNumber = argv[0];
+		int tile = argv[1];
+		clearWindow(windowNumber, tile);
+		return 0;
+	}
+	if (funcid == 5) { // set a tile in a window
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int windowNumber = argv[2];
+		int tile = argv[3];
+
+		setWindowTile(locationX,locationY,windowNumber,tile);
+		return 0;
+	}
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -143,6 +236,7 @@ void updateInactiveTitlebars();
 void redrawAll();
 void drawWallpaper();
 void printWindow(int x, int y, int windowNumber, char *text);
+void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
 void printWindowInt(int x, int y, int windowNumber, unsigned int val);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
@@ -153,6 +247,7 @@ void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
 int getActiveWindow();
 void initialize();
+void VMtest();
 void createAboutWindow();
 void createTilesWindow();
 void settingsChangeWallpaper(int num);
@@ -459,6 +554,14 @@ void handleMenuClick() {
 			redrawAll();
 			SoftReset();
 		}
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 5) { // clicked the test option
+			menu.clickedMenuItem = 0;
+			menu.selectedMenu = 0;
+			menu.selectedMenuItem = 0;
+			drawWallpaper();
+			redrawAll();
+			VMtest();
+		}
 		if (menu.selectedMenu == 4 && menu.clickedMenuItem != 0) { // clicked an option in the window menu
 			setActiveWindow(menu.clickedMenuItem);
 			menu.clickedMenuItem = 0;
@@ -566,6 +669,19 @@ void printWindow(int x, int y, int windowNumber, char *text) { // mostly copied 
 	}
 }
 
+void printWindowLen(int x, int y, int windowNumber, char *text, int textSize) {
+	int i = 0;
+	char c;
+	for (int num=0; num<textSize; num++) {
+		c = text[i++];
+		if (c != 0) {
+			c = ((c&127)-32);
+			if (fontColor == whitebg) setWindowTile(x++,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+c);
+			if (fontColor == blackbg) setWindowTile(x++,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+c);
+		}
+	}
+}
+
 void printWindowInt(int x, int y, int windowNumber, unsigned int val) { // mostly copied from the Uzebox kernel source
 	unsigned char c,i;
 
@@ -584,9 +700,9 @@ void setWindowTile(int x, int y, int windowNumber, unsigned int tile) {
 }
 
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
-	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in bank 0. this will contain 0 for no button, and any other value for the button number
-		for (int y=locationY; y<locationY+sizeY; y++) { // ^ if you need to see the button map for whatever reason, in updateActiveWindow() change it to SetTile from bank 0, this will draw the button map in the window
-			SpiRamWriteU8(0,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),buttonNumber);
+	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in the upper 32kb of bank 1
+		for (int y=locationY; y<locationY+sizeY; y++) { // ^ to see the button map, add 32768 to the location where the window tiles are read from
+			SpiRamWriteU8(1,(((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)))+32768,buttonNumber);
 		}
 	}
 
@@ -599,7 +715,7 @@ void createButton(int locationX, int locationY, int sizeX, int sizeY, int window
 }
 
 void updateButtonClicks() {
-	int buttonNumber = SpiRamReadU8(0,(((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29))); // this will contain the button number that was clicked
+	int buttonNumber = SpiRamReadU8(1,((((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)))+32768); // this will contain the button number that was clicked
 	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
 		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
 		window[getActiveWindow()].clickY = 300;
@@ -700,7 +816,7 @@ void clearWindow(int windowNumber, int tile) {
 	}
 	for (int x=window[windowNumber].x; x<window[windowNumber].sizeX+window[windowNumber].x; x++) {
 		for (int y=window[windowNumber].y; y<window[windowNumber].sizeY+window[windowNumber].y; y++) {
-			SpiRamWriteU8(0,(((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)),0); // clear button map
+			SpiRamWriteU8(1,((((y-window[windowNumber].y)*window[windowNumber].sizeX)+(x-window[windowNumber].x))+(windowNumber*(24*29)))+32768,0); // clear button map
 		}
 	}
 }
@@ -771,6 +887,47 @@ int main() {
 	ebs.id = 48879;
 	initialize();
 
+	// sd card stuff
+	u8  pos;
+	u8  res;
+	sdc_struct_t sd_struct;
+	u8  buf[512];
+	u32 t32;
+	sd_struct.bufp = &(buf[0]);
+
+	res = FS_Init(&sd_struct);
+	if (res != 0U) {
+		Print(3,0,PSTR("No SD Card!"));
+		PrintChar(36U, 3U, res + '0');
+		while(1);
+	}
+
+	t32 = FS_Find(&sd_struct, // look for vmcode.bin
+	    ((u16)('V') << 8) |
+	    ((u16)('M')     ),
+	    ((u16)('C') << 8) |
+	    ((u16)('O')     ),
+	    ((u16)('D') << 8) |
+	    ((u16)('E')     ),
+	    ((u16)(' ') << 8) |
+	    ((u16)(' ')     ),
+	    ((u16)('B') << 8) |
+	    ((u16)('I')     ),
+	    ((u16)('N') << 8) |
+	    ((u16)(0)       ));
+
+	if (t32 == 0U){
+		Print(3,0,PSTR("No file!"));
+		while(1);
+	}
+
+	FS_Select_Cluster(&sd_struct, t32);
+	FS_Read_Sector(&sd_struct); // read from file
+
+	for (int i=0; i<512; i++) {
+		SpiRamWriteU8(0,i,buf[i]); // read data from file into bank 0
+	}
+
 	EnableSnesMouse(0,cursor_map);
 
 	while(1) { // main loop
@@ -786,8 +943,25 @@ int main() {
 
 		updateButtonClicks();
 
+		if (vmRunning) {
+			for (int i=10; i>0; i--) {
+				embedvm_exec(&vm);
+			}
+		}
+
 		WaitVsync(1);
 	}
+}
+
+void VMtest() {
+	vm.ip = EMBEDVM_SYM_main;
+	vm.sp = vm.sfp = 32768; // does this need to be somewhere else in memory?
+	vm.mem_read = &mem_read;
+	vm.mem_write = &mem_write;
+	vm.call_user = &call_user;
+	embedvm_interrupt(&vm, EMBEDVM_SYM_main);
+
+	vmRunning = true;
 }
 
 // About window

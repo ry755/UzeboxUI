@@ -1,0 +1,42 @@
+function createWindow(locationX,locationY,sizeX,sizeY,title,titleSize) {
+	local i;
+	for (i=0; $ptr8u[title, i]; i++)
+		$uf0($ptr8u[title, i]);
+	$uf1(locationX,locationY,sizeX,sizeY,titleSize);
+	$uf0();
+}
+
+function printWindow(locationX,locationY,windowNumber,text,textSize) {
+	local i;
+	for (i=0; $ptr8u[text, i]; i++)
+		$uf0($ptr8u[text, i]);
+	$uf2(locationX,locationY,windowNumber,textSize);
+	$uf0();
+}
+
+function setWindowTile(locationX,locationY,windowNumber,tile) {
+	$uf5(locationX,locationY,windowNumber,tile);
+}
+
+function clearWindow(windowNumber,tile) {
+	$uf4(windowNumber,tile);
+}
+
+function main() {
+	local x,dx,y,dy,num;
+	x = 0;
+	y = 0;
+	dx = 1;
+	dy = 2;
+	createWindow(5,5,10,10,"hello!!!",8);
+	num = $uf3();
+	while(1) {
+		setWindowTile(x,y,num,0);
+		if (x >= 9) dx = -1;
+		if (x == 0) dx = 1;
+		if (y >= 9) dy = -1;
+		if (y == 0) dy = 2;
+		x += dx;
+		y += dy;
+	}
+}

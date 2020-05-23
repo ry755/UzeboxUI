@@ -1,0 +1,35 @@
+
+global points;
+
+function main()
+{
+	local num, guess;
+	points = 0;
+	while (1)
+	{
+		// report points
+		$uf4();
+
+		// get next random number
+		num = $uf0();
+		do {
+			// read next guess
+			guess = $uf1();
+			if (guess < num) {
+				// hint to user: try larger numbers
+				$uf2(+1);
+				points = points - 1;
+			}
+			if (guess > num) {
+				// hint to user: try smaller numbers
+				$uf2(-1);
+				points = points - 1;
+			}
+		} while (guess != num);
+
+		// level up!
+		points = points + 10;
+		$uf3();
+	}
+}
+

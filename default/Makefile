@@ -49,7 +49,7 @@ HEX_FLASH_FLAGS = -R .eeprom
 
 ## Objects that must be built in order to link
 #OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o spiram.o sdBase.o bootlib.o $(GAME).o
-OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o bootlib.o spiram.o $(GAME).o
+OBJECTS = uzeboxVideoEngineCore.o  uzeboxCore.o uzeboxSoundEngine.o uzeboxSoundEngineCore.o uzeboxVideoEngine.o bootlib.o spiram.o embedvm.o $(GAME).o
 
 ## Objects explicitly added by the user
 LINKONLYOBJECTS = 
@@ -83,6 +83,9 @@ bootlib.o: $(KERNEL_DIR)/bootlib.s $(DIRS)
 
 spiram.o: $(KERNEL_DIR)/spiram.s $(DIRS)
 	$(CC) $(INCLUDES) $(ASMFLAGS) -c $< -o $@
+
+embedvm.o: ../embedvm/vmsrc/embedvm.c $(DIRS)
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 ## Compile game sources
 $(GAME).o: ../$(GAME).c
