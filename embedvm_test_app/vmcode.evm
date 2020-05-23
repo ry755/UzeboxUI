@@ -30,6 +30,8 @@ function main() {
 	dy = 2;
 	createWindow(5,5,10,10,"hello!!!",8);
 	num = $uf3();
+	printWindow(1,1,num,"EmbedVM",7);
+	printWindow(1,2,num,"Test",4);
 	while(1) {
 		setWindowTile(x,y,num,0);
 		if (x >= 9) dx = -1;
