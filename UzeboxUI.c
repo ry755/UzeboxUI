@@ -124,10 +124,8 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 			tempChar[0] = '\0';
 			tempInt = 0;
 		} else {
-			if (argv[0] != 0) {
-				tempChar[tempInt] = argv[0];
-				tempInt++;
-			}
+			tempChar[tempInt] = argv[0];
+			tempInt++;
 		}
 		return 0;
 	}
