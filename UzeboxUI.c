@@ -43,7 +43,10 @@ int btnPressed = 0;		// buttons pressed this frame
 int btnReleased = 0;	// buttons released this frame
 int btnPrev = 0;		// buttons previously pressed
 
-int wallpaperTile = 1; // default wallpaper tile is 1
+int wallpaperTile = 1;	// default wallpaper tile is 1
+
+uint32_t frame = 0;		// frame counter
+uint32_t uptime = 0;	// uptime counter in seconds
 
 struct EepromBlockStruct ebs;
 
@@ -69,6 +72,7 @@ void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
 int getActiveWindow();
 void initialize();
+void vsyncCallback(void);
 void VMtest();
 void createAboutWindow();
 void createTilesWindow();
@@ -882,7 +886,14 @@ void initialize() {
 	}
 }
 
+void vsyncCallback(void) {
+	frame++;
+	uptime = frame/60;
+}
+
 int main() {
+	SetUserPreVsyncCallback(&vsyncCallback);
+
 	ebs.id = 48879;
 	initialize();
 
