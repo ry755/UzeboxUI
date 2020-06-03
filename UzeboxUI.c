@@ -47,6 +47,7 @@ uint32_t frame = 0;		// frame counter
 uint32_t uptime = 0;	// uptime counter in seconds
 
 int appToLoad = 0;
+int numberOfApps = 0;
 bool loadApp = false;
 
 struct EepromBlockStruct ebs;
@@ -112,19 +113,6 @@ const char windowMenu[][154] PROGMEM = {
 	"             8",
 	"             9",
 	"            10"
-};
-
-const char appsMenu[][110] PROGMEM = {
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          ",
-	"          "
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -284,7 +272,7 @@ void updateCursor() {
 
 	if (mouse & 0x80) {
 		cursor.x -= (mouse&0x7f);
-		if (cursor.x<0) cursor.x = 0; 
+		if (cursor.x<0) cursor.x = 0;
 	} else {
 		cursor.x += (mouse&0x7f);
 		if (cursor.x>240) cursor.x = 240;
@@ -378,7 +366,7 @@ void updateMenubar() {
 
 	if (menu.open && menu.selectedMenu == 10) { // apps menu (apps menu is menu number 10, it isn't a normal menu)
 		SetTile(1,0,6);
-		for (int i=0; i<sizeof(appsMenu)/sizeof(appsMenu[0]); i++) { // draw menu items and highlight them if mouse is over them
+		for (int i=0; i<numberOfApps; i++) { // draw menu items and highlight them if mouse is over them
 			if (cursor.x > 1*8 && cursor.x < (1+10)*8 && cursor.y > (i+1)*8 && cursor.y < (i+2)*8) { // if mouse is over menu item currently being printed. wow this looks like garbage
 				setFontColor(blackbg);
 				menu.selectedMenuItem = i+1;
@@ -386,7 +374,7 @@ void updateMenubar() {
 				setFontColor(whitebg);
 			}
 
-		Print(1,i+1,appsMenu[i]);
+		Print(1,i+1,PSTR("          "));
 		PrintRam(1,i+1,app[i].name);
 	}
 		setFontColor(blackbg);
@@ -987,7 +975,6 @@ int main() {
 
 	// parse the config file
 	int nameIndex = 0;
-	int appIndex = 0;
 	bool readingName = false;
 	bool readingFilename = false;
 	for (int i=0; i<512; i++) {
@@ -997,7 +984,7 @@ int main() {
 		}
 		if (buf[i] == ']') {
 			readingName = false;
-			app[appIndex].name[nameIndex] = '\0';
+			app[numberOfApps].name[nameIndex] = '\0';
 			nameIndex = 0;
 			continue;
 		}
@@ -1007,23 +994,23 @@ int main() {
 		}
 		if (buf[i] == ')') {
 			readingFilename = false;
-			app[appIndex].filename[nameIndex] = '\0';
+			app[numberOfApps].filename[nameIndex] = '\0';
 			nameIndex = 0;
 			continue;
 		}
-		if (buf[i] == '\\') {
+		if (buf[i] == ';') {
 			readingName = false;
 			readingFilename = false;
 			nameIndex = 0;
-			appIndex++;
+			numberOfApps++;
 			continue;
 		}
 		if (readingName) {
-			app[appIndex].name[nameIndex] = buf[i];
+			app[numberOfApps].name[nameIndex] = buf[i];
 			nameIndex++;
 		}
 		if (readingFilename) {
-			app[appIndex].filename[nameIndex] = buf[i];
+			app[numberOfApps].filename[nameIndex] = buf[i];
 			nameIndex++;
 		}
 	}
@@ -1128,7 +1115,6 @@ void createVM() {
 		window[newWindowNum].isVM = true;
 		window[newWindowNum].VMrunning = true;
 
-		Print(23,0,PSTR("0x"));
 		for (int i=250; i>0; i--) { // execute 250 instructions, should be enough for the application to create a window
 			embedvm_exec(&vm[newWindowNum]);
 			PrintHexInt(25,0,vm[getActiveWindow()].ip);
