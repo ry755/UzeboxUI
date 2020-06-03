@@ -17,8 +17,6 @@
  *  Uzebox is a reserved trade mark
 */
 
-// 16x16 mouse cursor sprite from here (currently unused): https://opengameart.org/content/simple-light-graysacle-cursors-16x16
-
 #include <stdbool.h>
 #include <avr/io.h>
 #include <stdlib.h>
@@ -833,7 +831,7 @@ void initialize() {
 	SetSpritesTileTable(spriteset);
 	setFontColor(whitebg);
 
-	sprites[0].tileIndex = 5;
+	sprites[0].tileIndex = 1;
 
 	if (EepromReadBlock(48879,&ebs) != 0) {
 		ebs.data[0] = 1; // byte 0 is the wallpaper tile
