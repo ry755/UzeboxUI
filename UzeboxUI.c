@@ -121,11 +121,6 @@ struct embedvm_s vm = { };
 
 bool vmRunning = false;
 
-// TODO: hard-coding these values probably isn't the best idea...
-#define EMBEDVM_SYM_main 0x0054
-#define EMBEDVM_SECT_SRAM_BEGIN 0x0000
-#define EMBEDVM_SECT_SRAM_END 0xffff
-
 int16_t mem_read(uint16_t addr, bool is16bit, void *ctx) {
 	if (addr + (is16bit ? 1 : 0) >= 32768) {
 		return 0;
@@ -963,12 +958,12 @@ int main() {
 }
 
 void VMtest() {
-	vm.ip = EMBEDVM_SYM_main;
+	vm.ip = 0x0000; // 0x0000 should contain a jump to main()
 	vm.sp = vm.sfp = 32768; // does this need to be somewhere else in memory?
 	vm.mem_read = &mem_read;
 	vm.mem_write = &mem_write;
 	vm.call_user = &call_user;
-	embedvm_interrupt(&vm, EMBEDVM_SYM_main);
+	embedvm_interrupt(&vm, 0x0000);
 
 	vmRunning = true;
 }

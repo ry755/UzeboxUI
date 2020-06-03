@@ -1,9 +1,12 @@
+array8u align[3];	// this is used to move everything forward by 3 bytes
+					// so a jump instruction can be inserted later. don't move it!
+
 function createWindow(locationX,locationY,sizeX,sizeY,title,titleSize) {
 	local i;
 	for (i=0; $ptr8u[title, i]; i++)
 		$uf0($ptr8u[title, i]);
 	$uf1(locationX,locationY,sizeX,sizeY,titleSize);
-	$uf0();
+	$uf0(); // call with no args to reset text buffer
 }
 
 function printWindow(locationX,locationY,windowNumber,text,textSize) {
@@ -11,7 +14,7 @@ function printWindow(locationX,locationY,windowNumber,text,textSize) {
 	for (i=0; $ptr8u[text, i]; i++)
 		$uf0($ptr8u[text, i]);
 	$uf2(locationX,locationY,windowNumber,textSize);
-	$uf0();
+	$uf0(); // call with no args to reset text buffer
 }
 
 function setWindowTile(locationX,locationY,windowNumber,tile) {
@@ -23,22 +26,31 @@ function clearWindow(windowNumber,tile) {
 }
 
 function main() {
-	local x,dx,y,dy,num;
+	local x,dx,y,dy,tile,dtile,num,delay;
 	x = 0;
 	y = 0;
+	tile = 36;
 	dx = 1;
 	dy = 2;
+	dtile = 1;
 	createWindow(5,5,10,10,"hello!!!",8);
-	num = $uf3();
-	printWindow(1,1,num,"EmbedVM",7);
-	printWindow(1,2,num,"Test",4);
+	num = $uf3(); // get window number
+	printWindow(0,1,num,"Hi!",3);
+	printWindow(0,3,num,"This is",7);
+	printWindow(0,4,num,"running in",10);
+	printWindow(0,5,num,"EmbedVM!",8);
+	for (delay=175; delay>0; delay--){} // wait for a bit
+	clearWindow(num,3);
 	while(1) {
-		setWindowTile(x,y,num,0);
+		setWindowTile(x,y,num,tile);
 		if (x >= 9) dx = -1;
 		if (x == 0) dx = 1;
 		if (y >= 9) dy = -1;
 		if (y == 0) dy = 2;
+		if (tile == 40) dtile = -1;
+		if (tile == 36) dtile = 1;
 		x += dx;
 		y += dy;
+		tile += dtile;
 	}
 }
