@@ -11,11 +11,11 @@ for line in open(appname + ".hdr"):
     if match:
         main_addr = match.group(1)
         main_addr = main_addr[2:] # remove 0x
-        main_addr = main_addr[2:].zfill(4) # pad with zeros if needed
+        main_addr = main_addr.zfill(4) # pad with zeros if needed
         print("Application will jump to 0x" + main_addr)
 
 with open(appname + ".bin", "r+b") as new:
     new.write(b'\xA1') # jump (2-byte rel. address)
-    new.write(struct.pack('b', int(main_addr[:2], 16))) # write first byte
-    new.write(struct.pack('b', int(main_addr[-2:], 16))) # write second byte
+    new.write(struct.pack('B', int(main_addr[:2], 16))) # write first byte
+    new.write(struct.pack('B', int(main_addr[-2:], 16))) # write second byte
     new.close()
