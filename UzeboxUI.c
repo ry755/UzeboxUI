@@ -970,7 +970,7 @@ void createVM() {
 	int newWindowNum = 1; // the window number that will be assigned to the window created by this VM
 	int numberOfUsedSlots = 0;
 
-	for (int i=10; i>0; i--) { // check for an empty window slot, starting from the bottom
+	for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
 		if (!window[i].created) {
 			newWindowNum = i;
 		} else {
@@ -980,12 +980,14 @@ void createVM() {
 	}
 
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
-		vm[newWindowNum].ip = 0x0000; // 0x0000 should contain a jump to main()
+		PrintInt(5,25,(3072*(newWindowNum-1)),false);
+
+		vm[newWindowNum].ip = 3072*(newWindowNum-1); // this entry point should contain a jump to main()
 		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
 		vm[newWindowNum].mem_read = &mem_read;
 		vm[newWindowNum].mem_write = &mem_write;
 		vm[newWindowNum].call_user = &call_user;
-		embedvm_interrupt(&vm[newWindowNum], 0x0000);
+		embedvm_interrupt(&vm[newWindowNum], 3072*(newWindowNum-1));
 
 		window[newWindowNum].isVM = true;
 		window[newWindowNum].VMrunning = true;
@@ -996,7 +998,7 @@ void createVM() {
 			PrintHexInt(25,0,vm[getActiveWindow()].ip);
 		}
 	} else {
-		Print(14,25,PSTR("No empty slots for VM!")); // temp, only until i add a dialog box function
+		Print(14,25,PSTR("No empty slots!")); // temp, only until i add a dialog box function
 	}
 	Print(11,25,PSTR("Leaving createVM()"));
 }
