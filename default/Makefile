@@ -117,11 +117,7 @@ enviousfonts: ../data/fonts/envious-blackbg.png ../data/fonts/envious-whitebg.pn
 %.uze: $(TARGET)
 	-$(UZEBIN_DIR)/packrom $(GAME).hex $@ $(INFO)
 
-UNAME := $(shell sh -c 'uname -s 2>/dev/null || echo not')
-AVRSIZEFLAGS := -A ${TARGET}
-ifneq (,$(findstring MINGW,$(UNAME)))
 AVRSIZEFLAGS := -C --mcu=${MCU} ${TARGET}
-endif
 
 size: ${TARGET}
 	@echo
