@@ -131,7 +131,7 @@ const char appsMenu[][110] PROGMEM = {
 
 // EmbedVM ///////////////////////////////////////////////////////////////
 
-struct embedvm_s vm[10] = { };
+struct embedvm_s vm[11] = { };
 
 int16_t mem_read(uint16_t addr, bool is16bit, void *ctx) {
 	if (addr + (is16bit ? 1 : 0) >= 32768) {
@@ -344,10 +344,10 @@ void updateController() {
 }
 
 void setFontColor(int font) {
-	if (font == whitebg || font == 0) {
+	if (font == whitebg) {
 		SetFontTilesIndex(TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE);
 	}
-	if (font == blackbg || font == 1) {
+	if (font == blackbg) {
 		SetFontTilesIndex(TILESET_SIZE+SPRITESET_SIZE);
 	}
 
@@ -1118,8 +1118,6 @@ void createVM() {
 	}
 
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
-		PrintInt(5,25,(3072*(newWindowNum-1)),false);
-
 		vm[newWindowNum].ip = 3072*(newWindowNum-1); // this entry point should contain a jump to main()
 		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
 		vm[newWindowNum].mem_read = &mem_read;
