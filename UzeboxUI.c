@@ -46,6 +46,9 @@ int wallpaperTile = 1;	// default wallpaper tile is 1
 uint32_t frame = 0;		// frame counter
 uint32_t uptime = 0;	// uptime counter in seconds
 
+int appToLoad = 0;
+bool loadApp = false;
+
 struct EepromBlockStruct ebs;
 
 void updateCursor();
@@ -53,7 +56,7 @@ void updateControllers();
 void setFontColor(int font);
 void updateMenubar();
 void updateClick();
-void handleMenuClicks();
+void handleMenuClick();
 void updateActiveWindow();
 void updateInactiveTitlebars();
 void redrawAll();
@@ -82,10 +85,10 @@ void createSettingsWindow();
 
 const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
 	"About     ",
+	"Apps     >",
 	"Settings  ",
 	"Tiles     ",
-	"Reset     ",
-	"Test      "
+	"Reset     "
 };
 
 const char fileMenu[][22] PROGMEM = {
@@ -108,7 +111,20 @@ const char windowMenu[][154] PROGMEM = {
 	"             7",
 	"             8",
 	"             9",
-	"            10",
+	"            10"
+};
+
+const char appsMenu[][110] PROGMEM = {
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          ",
+	"          "
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -168,7 +184,9 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		int locationY = argv[1];
 		int windowNumber = argv[2];
 		int textSize = argv[3];
+		int color = argv[4];
 
+		setFontColor(color);
 		printWindowLen(locationX,locationY,windowNumber,tempChar,textSize);
 		return 0;
 	}
@@ -228,6 +246,11 @@ struct Window {
 	int prevY; // ^
 	bool dragging;
 } window[11];
+
+struct App { // this struct simply holds app names and file names
+	unsigned char name[11];
+	unsigned char filename[12];
+} app[10];
 
 struct Button {
 	bool created;
@@ -321,10 +344,10 @@ void updateController() {
 }
 
 void setFontColor(int font) {
-	if (font == whitebg) {
+	if (font == whitebg || font == 0) {
 		SetFontTilesIndex(TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE);
 	}
-	if (font == blackbg) {
+	if (font == blackbg || font == 1) {
 		SetFontTilesIndex(TILESET_SIZE+SPRITESET_SIZE);
 	}
 
@@ -351,6 +374,22 @@ void updateMenubar() {
 
 	} else {
 		SetTile(1,0,5);
+	}
+
+	if (menu.open && menu.selectedMenu == 10) { // apps menu (apps menu is menu number 10, it isn't a normal menu)
+		SetTile(1,0,6);
+		for (int i=0; i<sizeof(appsMenu)/sizeof(appsMenu[0]); i++) { // draw menu items and highlight them if mouse is over them
+			if (cursor.x > 1*8 && cursor.x < (1+10)*8 && cursor.y > (i+1)*8 && cursor.y < (i+2)*8) { // if mouse is over menu item currently being printed. wow this looks like garbage
+				setFontColor(blackbg);
+				menu.selectedMenuItem = i+1;
+			} else {
+				setFontColor(whitebg);
+			}
+
+		Print(1,i+1,appsMenu[i]);
+		PrintRam(1,i+1,app[i].name);
+	}
+		setFontColor(blackbg);
 	}
 
 	if (menu.open && menu.selectedMenu == 2) { // file menu
@@ -526,7 +565,15 @@ void handleMenuClick() {
 			redrawAll();
 			createAboutWindow();
 		}
-		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 2) { // clicked the settings option
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 2) { // clicked the apps option
+			menu.clickedMenuItem = 0;
+			menu.selectedMenu = 10;
+			menu.selectedMenuItem = 0;
+			drawWallpaper();
+			redrawAll();
+			menu.open = true;
+		}
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 3) { // clicked the settings option
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -534,7 +581,7 @@ void handleMenuClick() {
 			redrawAll();
 			createSettingsWindow();
 		}
-		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 3) { // clicked the tiles option
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 4) { // clicked the tiles option
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -542,7 +589,7 @@ void handleMenuClick() {
 			redrawAll();
 			createTilesWindow();
 		}
-		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 4) { // clicked the quit option
+		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 5) { // clicked the quit option
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -550,16 +597,17 @@ void handleMenuClick() {
 			redrawAll();
 			SoftReset();
 		}
-		if (menu.selectedMenu == 1 && menu.clickedMenuItem == 5) { // clicked the test option
+		if (menu.selectedMenu == 4 && menu.clickedMenuItem != 0) { // clicked an option in the window menu
+			setActiveWindow(menu.clickedMenuItem);
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
 			drawWallpaper();
 			redrawAll();
-			createVM();
 		}
-		if (menu.selectedMenu == 4 && menu.clickedMenuItem != 0) { // clicked an option in the window menu
-			setActiveWindow(menu.clickedMenuItem);
+		if (menu.selectedMenu == 10 && menu.clickedMenuItem != 0) { // clicked an option in the apps menu
+			appToLoad = menu.clickedMenuItem-1;
+			loadApp = true;
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -884,7 +932,7 @@ void initialize() {
 	}
 
 	if (!SpiRamInit()) { // initialize SPIRAM
-		Print(9,0,PSTR("No SPI RAM!"));
+		Print(3,0,PSTR("No SPI RAM!"));
 		while(1);
 	}
 }
@@ -896,8 +944,6 @@ void vsyncCallback(void) {
 
 int main() {
 	SetUserPreVsyncCallback(&vsyncCallback);
-
-	ebs.id = 48879;
 	initialize();
 
 	// sd card stuff
@@ -914,18 +960,20 @@ int main() {
 		while(1);
 	}
 
-	t32 = FS_Find(&sd_struct, // look for vmcode.bin
-	    ((u16)('V') << 8) |
-	    ((u16)('M')     ),
-	    ((u16)('C') << 8) |
-	    ((u16)('O')     ),
-	    ((u16)('D') << 8) |
-	    ((u16)('E')     ),
-	    ((u16)(' ') << 8) |
-	    ((u16)(' ')     ),
-	    ((u16)('B') << 8) |
+	ebs.id = 48879;
+
+	t32 = FS_Find(&sd_struct, // look for uzeboxui.txt
+	    ((u16)('U') << 8) |
+	    ((u16)('Z')     ),
+	    ((u16)('E') << 8) |
+	    ((u16)('B')     ),
+	    ((u16)('O') << 8) |
+	    ((u16)('X')     ),
+	    ((u16)('U') << 8) |
 	    ((u16)('I')     ),
-	    ((u16)('N') << 8) |
+	    ((u16)('T') << 8) |
+	    ((u16)('X')     ),
+	    ((u16)('T') << 8) |
 	    ((u16)(0)       ));
 
 	if (t32 == 0U){
@@ -934,10 +982,50 @@ int main() {
 	}
 
 	FS_Select_Cluster(&sd_struct, t32);
+	FS_Reset_Sector(&sd_struct);
 	FS_Read_Sector(&sd_struct); // read from file
 
+	// parse the config file
+	int nameIndex = 0;
+	int appIndex = 0;
+	bool readingName = false;
+	bool readingFilename = false;
 	for (int i=0; i<512; i++) {
-		SpiRamWriteU8(0,i,buf[i]); // read data from file into bank 0
+		if (buf[i] == '[') {
+			readingName = true;
+			continue;
+		}
+		if (buf[i] == ']') {
+			readingName = false;
+			app[appIndex].name[nameIndex] = '\0';
+			nameIndex = 0;
+			continue;
+		}
+		if (buf[i] == '(') {
+			readingFilename = true;
+			continue;
+		}
+		if (buf[i] == ')') {
+			readingFilename = false;
+			app[appIndex].filename[nameIndex] = '\0';
+			nameIndex = 0;
+			continue;
+		}
+		if (buf[i] == '\\') {
+			readingName = false;
+			readingFilename = false;
+			nameIndex = 0;
+			appIndex++;
+			continue;
+		}
+		if (readingName) {
+			app[appIndex].name[nameIndex] = buf[i];
+			nameIndex++;
+		}
+		if (readingFilename) {
+			app[appIndex].filename[nameIndex] = buf[i];
+			nameIndex++;
+		}
 	}
 
 	EnableSnesMouse(0,cursor_map);
@@ -954,6 +1042,57 @@ int main() {
 		updateMenubar();
 
 		updateButtonClicks();
+
+		if (loadApp) {
+			loadApp = false;
+
+			setFontColor(whitebg);
+			Fill(1,0,28,1,3);
+			SetTile(1,0,5);
+			PrintRam(3,0,app[appToLoad].name);
+			WaitVsync(20);
+
+			t32 = FS_Find(&sd_struct, // look for file
+	    		((u16)(app[appToLoad].filename[0]) << 8) |
+	    		((u16)(app[appToLoad].filename[1])     ),
+	    		((u16)(app[appToLoad].filename[2]) << 8) |
+	    		((u16)(app[appToLoad].filename[3])     ),
+	    		((u16)(app[appToLoad].filename[4]) << 8) |
+	    		((u16)(app[appToLoad].filename[5])     ),
+	    		((u16)(app[appToLoad].filename[6]) << 8) |
+	    		((u16)(app[appToLoad].filename[7])     ),
+	    		((u16)(app[appToLoad].filename[8]) << 8) |
+	    		((u16)(app[appToLoad].filename[9])     ),
+	    		((u16)(app[appToLoad].filename[10]) << 8) |
+	    		((u16)(0)       ));
+
+			if (t32 == 0U){
+				Fill(1,0,28,1,3);
+				SetTile(1,0,5);
+				Print(3,0,PSTR("No file!"));
+				PrintRam(12,0,app[appToLoad].filename);
+				WaitVsync(120);
+				Fill(1,0,28,1,3);
+			}
+
+			FS_Select_Cluster(&sd_struct, t32);
+			FS_Reset_Sector(&sd_struct);
+			FS_Read_Sector(&sd_struct); // read from file
+
+			int newWindowNum = 1;
+			for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
+				if (!window[i].created) // this is to figure out where the application data needs to be for the new VM
+					newWindowNum = i;
+			}
+
+			for (int i=0; i<512; i++) {
+				SpiRamWriteU8(0,(3072*(newWindowNum-1))+i,buf[i]); // read data from file into bank 0
+			}
+
+			createVM();
+
+			Fill(1,0,28,1,3);
+		}
 
 		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
 			for (int i=10; i>0; i--) { // execute 10 instructions
@@ -976,7 +1115,6 @@ void createVM() {
 		} else {
 			numberOfUsedSlots++;
 		}
-		PrintInt(28,25,newWindowNum,false);
 	}
 
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
@@ -1000,7 +1138,6 @@ void createVM() {
 	} else {
 		Print(14,25,PSTR("No empty slots!")); // temp, only until i add a dialog box function
 	}
-	Print(11,25,PSTR("Leaving createVM()"));
 }
 
 // About window
