@@ -64,14 +64,14 @@ void printWindowInt(int x, int y, int windowNumber, unsigned int val);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
 void updateButtonClicks();
-void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize);
+void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize, bool isVM);
 void destroyWindow(int windowNumber);
 void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
 int getActiveWindow();
 void initialize();
 void vsyncCallback(void);
-void VMtest();
+void createVM();
 void createAboutWindow();
 void createTilesWindow();
 void settingsChangeWallpaper(int num);
@@ -115,9 +115,7 @@ const char windowMenu[][154] PROGMEM = {
 
 // EmbedVM ///////////////////////////////////////////////////////////////
 
-struct embedvm_s vm = { };
-
-bool vmRunning = false;
+struct embedvm_s vm[10] = { };
 
 int16_t mem_read(uint16_t addr, bool is16bit, void *ctx) {
 	if (addr + (is16bit ? 1 : 0) >= 32768) {
@@ -162,7 +160,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		int sizeY = argv[3];
 		int titleSize = argv[4];
 
-		createWindow(locationX,locationY,sizeX,sizeY,tempChar,titleSize);
+		createWindow(locationX,locationY,sizeX,sizeY,tempChar,titleSize,true);
 		return 0;
 	}
 	if (funcid == 2) { // print in a window
@@ -216,6 +214,8 @@ int fontColor;
 
 struct Window {
 	bool created;
+	bool isVM; // true if EmbedVM is running with this window
+	bool VMrunning; // if this window is a VM, then this is true if it's currently running
 	int x;
 	int y;
 	int sizeX;
@@ -556,7 +556,7 @@ void handleMenuClick() {
 			menu.selectedMenuItem = 0;
 			drawWallpaper();
 			redrawAll();
-			VMtest();
+			createVM();
 		}
 		if (menu.selectedMenu == 4 && menu.clickedMenuItem != 0) { // clicked an option in the window menu
 			setActiveWindow(menu.clickedMenuItem);
@@ -719,7 +719,7 @@ void updateButtonClicks() {
 	}
 }
 
-void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize) { // locationX and locationY are where the actual window contents start, not the titlebar
+void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize, bool isVM) { // locationX and locationY are where the actual window contents start, not the titlebar
 	int newWindowNum = 1; // window number for the window that will be created here
 	int numberOfUsedSlots = 0;
 
@@ -733,6 +733,12 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
 		window[newWindowNum].created = true;
+
+		window[newWindowNum].isVM = isVM;
+		if (isVM)
+			window[newWindowNum].VMrunning = true;
+		else
+			window[newWindowNum].VMrunning = false;
 
 		window[newWindowNum].x = locationX;
 		window[newWindowNum].y = locationY;
@@ -782,11 +788,15 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 }
 
 void destroyWindow(int windowNumber) {
-	SetTile(window[windowNumber].x, window[windowNumber].y-1, 15); // draw X in the close button
+	SetTile(window[windowNumber].x, window[windowNumber].y-1, 15); // draw square in the close button
 	WaitVsync(3);
-	window[getActiveWindow()].created = false;
+	window[windowNumber].created = false;
+
+	if (window[windowNumber].isVM) window[windowNumber].VMrunning = false;
+	window[windowNumber].isVM = false;
+
 	for (int i=0; i<10; i++) {
-		window[getActiveWindow()].title[i] = 0;
+		window[getActiveWindow()].title[i] = '\0';
 	}
 
 	for (int buttonNum=0; buttonNum<100; buttonNum++) { // remove any buttons that may have been on this window
@@ -945,9 +955,10 @@ int main() {
 
 		updateButtonClicks();
 
-		if (vmRunning) {
-			for (int i=10; i>0; i--) {
-				embedvm_exec(&vm);
+		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
+			for (int i=10; i>0; i--) { // execute 10 instructions
+				embedvm_exec(&vm[getActiveWindow()]);
+				PrintHexInt(25,0,vm[getActiveWindow()].ip);
 			}
 		}
 
@@ -955,21 +966,45 @@ int main() {
 	}
 }
 
-void VMtest() {
-	vm.ip = 0x0000; // 0x0000 should contain a jump to main()
-	vm.sp = vm.sfp = 32768; // does this need to be somewhere else in memory?
-	vm.mem_read = &mem_read;
-	vm.mem_write = &mem_write;
-	vm.call_user = &call_user;
-	embedvm_interrupt(&vm, 0x0000);
+void createVM() {
+	int newWindowNum = 1; // the window number that will be assigned to the window created by this VM
+	int numberOfUsedSlots = 0;
 
-	vmRunning = true;
+	for (int i=10; i>0; i--) { // check for an empty window slot, starting from the bottom
+		if (!window[i].created) {
+			newWindowNum = i;
+		} else {
+			numberOfUsedSlots++;
+		}
+		PrintInt(28,25,newWindowNum,false);
+	}
+
+	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
+		vm[newWindowNum].ip = 0x0000; // 0x0000 should contain a jump to main()
+		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (4096*(newWindowNum-1)); // each VM gets 4KB for its stack, hopefully enough?
+		vm[newWindowNum].mem_read = &mem_read;
+		vm[newWindowNum].mem_write = &mem_write;
+		vm[newWindowNum].call_user = &call_user;
+		embedvm_interrupt(&vm[newWindowNum], 0x0000);
+
+		window[newWindowNum].isVM = true;
+		window[newWindowNum].VMrunning = true;
+
+		Print(23,0,PSTR("0x"));
+		for (int i=250; i>0; i--) { // execute 250 instructions, should be enough for the application to create a window
+			embedvm_exec(&vm[newWindowNum]);
+			PrintHexInt(25,0,vm[getActiveWindow()].ip);
+		}
+	} else {
+		Print(14,25,PSTR("No empty slots for VM!")); // temp, only until i add a dialog box function
+	}
+	Print(11,25,PSTR("Leaving createVM()"));
 }
 
 // About window
 
 void createAboutWindow() {
-	createWindow(5,5,10,10,"About",5);
+	createWindow(5,5,10,10,"About",5,false);
 	clearWindow(getActiveWindow(),0); // fill window with black tiles (tile 0)
 
 	for (int x=3; x<8; x++) {
@@ -987,7 +1022,7 @@ void createAboutWindow() {
 // Tiles window (tile info)
 
 void createTilesWindow() {
-	createWindow(5,5,11,13,"Tile Info",9);
+	createWindow(5,5,11,13,"Tile Info",9,false);
 
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Total");
@@ -1018,7 +1053,7 @@ void settingsSaveWallpaper() {
 }
 
 void createSettingsWindow() {
-	createWindow(5,5,16,5,"Settings",8);
+	createWindow(5,5,16,5,"Settings",8,false);
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Wallpaper");
 
