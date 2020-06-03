@@ -981,7 +981,7 @@ void createVM() {
 
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
 		vm[newWindowNum].ip = 0x0000; // 0x0000 should contain a jump to main()
-		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (4096*(newWindowNum-1)); // each VM gets 4KB for its stack, hopefully enough?
+		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
 		vm[newWindowNum].mem_read = &mem_read;
 		vm[newWindowNum].mem_write = &mem_write;
 		vm[newWindowNum].call_user = &call_user;
