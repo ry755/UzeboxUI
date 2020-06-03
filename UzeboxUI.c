@@ -238,6 +238,7 @@ struct Window {
 struct App { // this struct simply holds app names and file names
 	unsigned char name[11];
 	unsigned char filename[12];
+	int sectors; // number of sectors required to load the file
 } app[10];
 
 struct Button {
@@ -1053,32 +1054,49 @@ int main() {
 	    		((u16)(app[appToLoad].filename[10]) << 8) |
 	    		((u16)(0)       ));
 
-			if (t32 == 0U){
+			if (t32 == 0U) { // file not found
 				Fill(1,0,28,1,3);
 				SetTile(1,0,5);
 				Print(3,0,PSTR("No file!"));
 				PrintRam(12,0,app[appToLoad].filename);
 				WaitVsync(120);
 				Fill(1,0,28,1,3);
+			} else {
+				FS_Select_Cluster(&sd_struct, t32);
+				FS_Reset_Sector(&sd_struct);
+				FS_Read_Sector(&sd_struct); // read from file
 			}
 
-			FS_Select_Cluster(&sd_struct, t32);
-			FS_Reset_Sector(&sd_struct);
-			FS_Read_Sector(&sd_struct); // read from file
-
-			int newWindowNum = 1;
-			for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
-				if (!window[i].created) // this is to figure out where the application data needs to be for the new VM
-					newWindowNum = i;
+			app[appToLoad].sectors = buf[3];
+			if (app[appToLoad].sectors > 6) { // don't allow files greater than 3KB
+				Fill(1,0,28,1,3);
+				SetTile(1,0,5);
+				Print(3,0,PSTR("File too big!"));
+				PrintRam(17,0,app[appToLoad].filename);
+				WaitVsync(120);
+				Fill(1,0,28,1,3);
 			}
 
-			for (int i=0; i<512; i++) {
-				SpiRamWriteU8(0,(3072*(newWindowNum-1))+i,buf[i]); // read data from file into bank 0
-			}
+			if (app[appToLoad].sectors <= 6 && t32 != 0U) {
+				int newWindowNum = 1;
+				for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
+					if (!window[i].created) // this is to figure out where the application data needs to be for the new VM
+						newWindowNum = i;
+				}
 
-			createVM();
+				for (int sector=0; sector<app[appToLoad].sectors; sector++) {
+					for (int i=0; i<512; i++) {
+						SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),buf[i]); // read data from file into bank 0
+					}
+					FS_Next_Sector(&sd_struct);
+					FS_Read_Sector(&sd_struct);
+				}
+
+				createVM();
+			}
 
 			Fill(1,0,28,1,3);
+			SetTile(1,0,5);
 		}
 
 		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {

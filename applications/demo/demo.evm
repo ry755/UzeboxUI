@@ -1,5 +1,5 @@
-array8u align[3];	// this is used to move everything forward by 3 bytes
-					// so a jump instruction can be inserted later. don't move it!
+array8u jump[3];	// empty space so a jump instruction can be inserted by the build script
+array8u size[1];	// empty space so the number of sectors can be inserted by the build script
 
 function createWindow(locationX,locationY,sizeX,sizeY,title,titleSize) {
 	local i;
