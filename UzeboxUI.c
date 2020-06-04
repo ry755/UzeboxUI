@@ -935,12 +935,14 @@ int main() {
 	SetUserPreVsyncCallback(&vsyncCallback);
 	initialize();
 
+	//SetRenderingParameters(FIRST_RENDER_LINE,8); // setting the rendering parameters to cover the affected VRAM area seems to break sd access?
+
 	// sd card stuff
 	u8  res;
 	sdc_struct_t sd_struct;
-	u8  buf[512];
+	//u8  buf[512];
 	u32 t32;
-	sd_struct.bufp = &(buf[0]);
+	sd_struct.bufp = &(vram[30]);
 
 	res = FS_Init(&sd_struct);
 	if (res != 0U) {
@@ -979,27 +981,27 @@ int main() {
 	bool readingName = false;
 	bool readingFilename = false;
 	for (int i=0; i<512; i++) {
-		if (buf[i] == '[') {
+		if (vram[i+30] == '[') {
 			readingName = true;
 			continue;
 		}
-		if (buf[i] == ']') {
+		if (vram[i+30] == ']') {
 			readingName = false;
 			app[numberOfApps].name[nameIndex] = '\0';
 			nameIndex = 0;
 			continue;
 		}
-		if (buf[i] == '(') {
+		if (vram[i+30] == '(') {
 			readingFilename = true;
 			continue;
 		}
-		if (buf[i] == ')') {
+		if (vram[i+30] == ')') {
 			readingFilename = false;
 			app[numberOfApps].filename[nameIndex] = '\0';
 			nameIndex = 0;
 			continue;
 		}
-		if (buf[i] == ';') {
+		if (vram[i+30] == ';') {
 			readingName = false;
 			readingFilename = false;
 			nameIndex = 0;
@@ -1007,14 +1009,18 @@ int main() {
 			continue;
 		}
 		if (readingName) {
-			app[numberOfApps].name[nameIndex] = buf[i];
+			app[numberOfApps].name[nameIndex] = vram[i+30];
 			nameIndex++;
 		}
 		if (readingFilename) {
-			app[numberOfApps].filename[nameIndex] = buf[i];
+			app[numberOfApps].filename[nameIndex] = vram[i+30];
 			nameIndex++;
 		}
 	}
+
+	//SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
+
+	initialize();
 
 	EnableSnesMouse(0,cursor_map);
 
@@ -1040,6 +1046,8 @@ int main() {
 			PrintRam(3,0,app[appToLoad].name);
 			WaitVsync(20);
 
+			SetRenderingParameters(FIRST_RENDER_LINE,8);
+
 			t32 = FS_Find(&sd_struct, // look for file
 	    		((u16)(app[appToLoad].filename[0]) << 8) |
 	    		((u16)(app[appToLoad].filename[1])     ),
@@ -1059,6 +1067,9 @@ int main() {
 				SetTile(1,0,5);
 				Print(3,0,PSTR("No file!"));
 				PrintRam(12,0,app[appToLoad].filename);
+				drawWallpaper();
+				redrawAll();
+				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 				WaitVsync(120);
 				Fill(1,0,28,1,3);
 			} else {
@@ -1067,12 +1078,15 @@ int main() {
 				FS_Read_Sector(&sd_struct); // read from file
 			}
 
-			app[appToLoad].sectors = buf[3];
-			if (app[appToLoad].sectors > 6) { // don't allow files greater than 3KB
+			app[appToLoad].sectors = vram[3+30];
+			if (app[appToLoad].sectors > 6 && t32 != 0U) { // don't allow files greater than 3KB
 				Fill(1,0,28,1,3);
 				SetTile(1,0,5);
 				Print(3,0,PSTR("File too big!"));
 				PrintRam(17,0,app[appToLoad].filename);
+				drawWallpaper();
+				redrawAll();
+				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 				WaitVsync(120);
 				Fill(1,0,28,1,3);
 			}
@@ -1086,11 +1100,16 @@ int main() {
 
 				for (int sector=0; sector<app[appToLoad].sectors; sector++) {
 					for (int i=0; i<512; i++) {
-						SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),buf[i]); // read data from file into bank 0
+						SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),vram[i+30]); // read data from file into bank 0
 					}
 					FS_Next_Sector(&sd_struct);
 					FS_Read_Sector(&sd_struct);
 				}
+
+				drawWallpaper();
+				redrawAll();
+
+				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 
 				createVM();
 			}
@@ -1102,7 +1121,6 @@ int main() {
 		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
 			for (int i=10; i>0; i--) { // execute 10 instructions
 				embedvm_exec(&vm[getActiveWindow()]);
-				PrintHexInt(25,0,vm[getActiveWindow()].ip);
 			}
 		}
 
@@ -1135,7 +1153,6 @@ void createVM() {
 
 		for (int i=250; i>0; i--) { // execute 250 instructions, should be enough for the application to create a window
 			embedvm_exec(&vm[newWindowNum]);
-			PrintHexInt(25,0,vm[getActiveWindow()].ip);
 		}
 	} else {
 		Print(14,25,PSTR("No empty slots!")); // temp, only until i add a dialog box function
