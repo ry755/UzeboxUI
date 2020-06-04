@@ -52,6 +52,8 @@ bool loadApp = false;
 
 struct EepromBlockStruct ebs;
 
+extern unsigned char ram_tiles[];
+
 void updateCursor();
 void updateControllers();
 void setFontColor(int font);
@@ -194,6 +196,24 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		int tile = argv[3];
 
 		setWindowTile(locationX,locationY,windowNumber,tile);
+		return 0;
+	}
+	if (funcid == 6) { // set a ramtile in a window
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int windowNumber = argv[2];
+		int tile = argv[3];
+
+		setWindowTile(locationX,locationY,windowNumber,tile-RAM_TILES_COUNT);
+		return 0;
+	}
+	if (funcid == 7) { // write to a ramtile
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int ramtile = argv[2];
+		int color = argv[3];
+
+		ram_tiles[(ramtile*64)+((locationY*8)+locationX)] = color;
 		return 0;
 	}
 	return 0;
@@ -877,6 +897,7 @@ void initialize() {
 	SetTileTable(tileset);
 	SetSpritesTileTable(spriteset);
 	setFontColor(whitebg);
+	SetUserRamTilesCount(9);
 
 	sprites[0].tileIndex = 1;
 
