@@ -54,6 +54,12 @@ struct EepromBlockStruct ebs;
 
 extern unsigned char ram_tiles[];
 
+// sd card stuff
+u8  res;
+sdc_struct_t sd_struct;
+//u8  buf[512];
+u32 t32;
+
 void updateCursor();
 void updateControllers();
 void setFontColor(int font);
@@ -76,6 +82,8 @@ void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
 int getActiveWindow();
 void initialize();
+void initScreen();
+void splash();
 void vsyncCallback(void);
 void createVM();
 void createAboutWindow();
@@ -908,15 +916,6 @@ void initialize() {
 
 	wallpaperTile = ebs.data[0]; // byte 0 is the wallpaper tile
 
-	Fill(0,0,30,27,wallpaperTile); // draw background
-
-	// draw menubar
-	SetTile(0,0,2);
-	Fill(1,0,28,1,3);
-	SetTile(29,0,4);
-
-	SetTile(1,0,5); // draw Uze menu button
-
 	//MapSprite(0, cursor_map);
 
 	cursor.x = 4;
@@ -947,6 +946,91 @@ void initialize() {
 	}
 }
 
+void initScreen() {
+	Fill(0,0,30,27,wallpaperTile); // draw background
+
+	// draw menubar
+	SetTile(0,0,2);
+	Fill(1,0,28,1,3);
+	SetTile(29,0,4);
+
+	SetTile(1,0,5); // draw Uze menu button
+}
+
+void splash() {
+	SetRenderingParameters(FIRST_RENDER_LINE,8);
+	t32 = FS_Find(&sd_struct, // look for splash.raw
+	((u16)('S') << 8) |
+	((u16)('P')     ),
+	((u16)('L') << 8) |
+	((u16)('A')     ),
+	((u16)('S') << 8) |
+	((u16)('H')     ),
+	((u16)(' ') << 8) |
+	((u16)(' ')     ),
+	((u16)('R') << 8) |
+	((u16)('A')     ),
+	((u16)('W') << 8) |
+    ((u16)(0)       ));
+
+	if (t32 == 0U) { // splash.bin not found, use Uzebox logo instead
+		ClearVram();
+		for (int x=((SCREEN_TILES_H/2U)-2U); x<((SCREEN_TILES_H/2U)-2U)+5; x++) {
+			for (int y=12; y<16; y++) {
+				SetTile(x,y,(((y-3)*5)+x)-42);
+			}
+		}
+	} else { // splash.bin was found! let's load it into ramtiles
+		FS_Select_Cluster(&sd_struct, t32);
+		FS_Reset_Sector(&sd_struct);
+		FS_Read_Sector(&sd_struct); // read from file
+
+		int index = 0;
+		for (int ramtile=0; ramtile<8; ramtile++) {
+			for (int y=0; y<8; y++) {
+				for (int x=0; x<8; x++) {
+					if (ramtile == 0 && x == 0 && y == 0) index = 0;
+					if (ramtile == 1 && x == 0 && y == 0) index = 8;
+					if (ramtile == 2 && x == 0 && y == 0) index = 16;
+					if (ramtile == 3 && x == 0 && y == 0) index = 24;
+					if (ramtile == 4 && x == 0 && y == 0) index = 256;
+					if (ramtile == 5 && x == 0 && y == 0) index = 264;
+					if (ramtile == 6 && x == 0 && y == 0) index = 272;
+					if (ramtile == 7 && x == 0 && y == 0) index = 280;
+					ram_tiles[(ramtile*64)+((y*8)+x)] = vram[30+index]; // vram is used as the sd card buffer
+					index++;
+				}
+				index += 24;
+			}
+		}
+		
+		ClearVram();
+		SetTile(((SCREEN_TILES_H/2U)-1U)-1,12,0-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+0,12,1-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+1,12,2-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+2,12,3-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)-1,13,4-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+0,13,5-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+1,13,6-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+2,13,7-RAM_TILES_COUNT);
+		SetTile(((SCREEN_TILES_H/2U)-1U)-1,14,31);
+		SetTile(((SCREEN_TILES_H/2U)-1U),14,32);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+1,14,33);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+2,14,34);
+		SetTile(((SCREEN_TILES_H/2U)-1U)+3,14,35);
+
+	}
+
+	FadeOut(1,true);
+	SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
+	FadeIn(1,true);
+	WaitVsync(30);
+	FadeOut(1,true);
+	ClearVram();
+	FadeIn(1,true);
+	WaitVsync(1);
+}
+
 void vsyncCallback(void) {
 	frame++;
 	uptime = frame/60;
@@ -956,23 +1040,19 @@ int main() {
 	SetUserPreVsyncCallback(&vsyncCallback);
 	initialize();
 
-	//SetRenderingParameters(FIRST_RENDER_LINE,8); // setting the rendering parameters to cover the affected VRAM area seems to break sd access?
+	//SetRenderingParameters(FIRST_RENDER_LINE,8); // setting the rendering parameters to cover the affected VRAM area seems to break sd init?
 
-	// sd card stuff
-	u8  res;
-	sdc_struct_t sd_struct;
-	//u8  buf[512];
-	u32 t32;
 	sd_struct.bufp = &(vram[30]);
 
 	res = FS_Init(&sd_struct);
 	if (res != 0U) {
 		Print(3,0,PSTR("No SD Card!"));
-		PrintChar(36U, 3U, res + '0');
 		while(1);
 	}
 
 	ebs.id = 48879;
+
+	SetRenderingParameters(FIRST_RENDER_LINE,8);
 
 	t32 = FS_Find(&sd_struct, // look for uzeboxui.txt
 	    ((u16)('U') << 8) |
@@ -1041,7 +1121,10 @@ int main() {
 
 	//SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 
-	initialize();
+	ClearVram();
+	splash();
+
+	initScreen();
 
 	EnableSnesMouse(0,cursor_map);
 
