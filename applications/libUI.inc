@@ -14,6 +14,10 @@ function printWindow(locationX,locationY,windowNumber,text,textSize,color) {
 	$uf0(); // call with no args to reset text buffer
 }
 
+function printWindowInt(locationX,locationY,windowNumber,num,color) {
+	$uf10(locationX,locationY,windowNumber,num,color);
+}
+
 function setWindowTile(locationX,locationY,windowNumber,tile) {
 	$uf5(locationX,locationY,windowNumber,tile);
 }
@@ -28,4 +32,12 @@ function plotRamTile(locationX,locationY,ramtile,color) {
 
 function clearWindow(windowNumber,tile) {
 	$uf4(windowNumber,tile);
+}
+
+function playPatch(patch,volume) {
+	$uf8(patch,volume);
+}
+
+function playNote(channel,patch,note,volume) {
+	$uf9(channel,patch,note,volume);
 }

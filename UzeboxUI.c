@@ -29,6 +29,7 @@
 
 #include "embedvm/vmsrc/embedvm.h"
 
+#include "data/patches.inc"
 #include "data/tileset.inc"
 #include "data/spriteset.inc"
 #include "data/fonts/envious-blackbg.inc"
@@ -236,6 +237,33 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		int color = argv[3];
 
 		ram_tiles[(ramtile*64)+((locationY*8)+locationX)] = color;
+		return 0;
+	}
+	if (funcid == 8 && argc == 2) { // play patch
+		unsigned char patch = argv[0];
+		unsigned char volume = argv[1];
+
+		TriggerFx(patch,volume,false);
+		return 0;
+	}
+	if (funcid == 9 && argc == 4) { // play note
+		unsigned char channel = argv[0];
+		unsigned char patch = argv[1];
+		unsigned char note = argv[2];
+		unsigned char volume = argv[3];
+
+		TriggerNote(channel,patch,note,volume);
+		return 0;
+	}
+	if (funcid == 10 && argc == 5) { // print window int
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int windowNumber = argv[2];
+		int num = argv[3];
+		int color = argv[4];
+
+		setFontColor(color);
+		printWindowInt(locationX,locationY,windowNumber,num);
 		return 0;
 	}
 	return 0;
@@ -933,6 +961,7 @@ void initialize() {
 	SetSpritesTileTable(spriteset);
 	setFontColor(whitebg);
 	SetUserRamTilesCount(9);
+	InitMusicPlayer(patches);
 
 	sprites[0].tileIndex = 1;
 
