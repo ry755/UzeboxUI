@@ -34,15 +34,15 @@
 #include "data/fonts/envious-blackbg.inc"
 #include "data/fonts/envious-whitebg.inc"
 
-int btnHeld = 0;          // buttons held right now
-int btnPressed = 0;       // buttons pressed this frame
-int btnReleased = 0;      // buttons released this frame
-int btnPrev = 0;          // buttons previously pressed
+int btnHeld = 0;             // buttons held right now
+int btnPressed = 0;          // buttons pressed this frame
+int btnReleased = 0;         // buttons released this frame
+int btnPrev = 0;             // buttons previously pressed
 
-int wallpaperTile = 1;    // default wallpaper tile is 1
+int wallpaperTile = 1;       // default wallpaper tile is 1
 
-uint32_t frame = 0;       // frame counter
-uint32_t uptime = 0;      // uptime counter in seconds
+uint32_t frame = 0;          // frame counter
+uint32_t uptime = 0;         // uptime counter in seconds
 
 int appToLoad = 0;
 int numberOfApps = 0;
@@ -56,6 +56,8 @@ extern unsigned char ram_tiles[];
 u8  res;
 sdc_struct_t sd_struct;
 u32 t32;
+
+unsigned int appSectors = 0; // sectors required to load the selected app
 
 void updateCursor();
 void updateControllers();
@@ -78,6 +80,10 @@ void destroyWindow(int windowNumber);
 void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
 int getActiveWindow();
+void setAppName(int app, int index, char character);
+char getAppName(int app, int index);
+void setAppFileName(int app, int index, char character);
+char getAppFileName(int app, int index);
 void initialize();
 void initScreen();
 void splash();
@@ -256,11 +262,11 @@ struct Window {
 	bool dragging;
 } window[11];
 
-struct App { // this struct simply holds app names and file names
+/*struct App { // this struct simply holds app names and file names
 	unsigned char name[11];
 	unsigned char filename[12];
 	int sectors; // number of sectors required to load the file
-} app[10];
+} app[10];*/
 
 struct Button {
 	bool created;
@@ -396,7 +402,10 @@ void updateMenubar() {
 			}
 
 		Print(1,i+1,PSTR("          "));
-		PrintRam(1,i+1,app[i].name);
+		//PrintRam(1,i+1,app[i].name);
+		for (int x=1; x<11; x++) {
+			if (getAppName(i,x-1) != 0) PrintChar(x,i+1,getAppName(i,x-1));
+		}
 	}
 		setFontColor(blackbg);
 	}
@@ -891,6 +900,22 @@ int getActiveWindow() {
 	return activeWindow;
 }
 
+void setAppName(int app, int index, char character) {
+	SpiRamWriteU8(0,32770+(app*11)+index,character);
+}
+
+char getAppName(int app, int index) {
+	return SpiRamReadU8(0,32770+(app*11)+index);
+}
+
+void setAppFileName(int app, int index, char character) {
+	SpiRamWriteU8(0,32880+(app*12)+index,character);
+}
+
+char getAppFileName(int app, int index) {
+	return SpiRamReadU8(0,32880+(app*12)+index);
+}
+
 void initialize() {
 	ClearVram();
 	SetTileTable(tileset);
@@ -1075,7 +1100,8 @@ int main() {
 		}
 		if (vram[i+30] == ']') {
 			readingName = false;
-			app[numberOfApps].name[nameIndex] = '\0';
+			//app[numberOfApps].name[nameIndex] = '\0';
+			setAppName(numberOfApps,nameIndex,'\0');
 			nameIndex = 0;
 			continue;
 		}
@@ -1085,7 +1111,8 @@ int main() {
 		}
 		if (vram[i+30] == ')') {
 			readingFilename = false;
-			app[numberOfApps].filename[nameIndex] = '\0';
+			//app[numberOfApps].filename[nameIndex] = '\0';
+			setAppFileName(numberOfApps,nameIndex,'\0');
 			nameIndex = 0;
 			continue;
 		}
@@ -1097,11 +1124,13 @@ int main() {
 			continue;
 		}
 		if (readingName) {
-			app[numberOfApps].name[nameIndex] = vram[i+30];
+			//app[numberOfApps].name[nameIndex] = vram[i+30];
+			setAppName(numberOfApps,nameIndex,vram[i+30]);
 			nameIndex++;
 		}
 		if (readingFilename) {
-			app[numberOfApps].filename[nameIndex] = vram[i+30];
+			//app[numberOfApps].filename[nameIndex] = vram[i+30];
+			setAppFileName(numberOfApps,nameIndex,vram[i+30]);
 			nameIndex++;
 		}
 	}
@@ -1132,12 +1161,15 @@ int main() {
 			setFontColor(whitebg);
 			Fill(1,0,28,1,3);
 			SetTile(1,0,5);
-			PrintRam(3,0,app[appToLoad].name);
+			//PrintRam(3,0,app[appToLoad].name);
+			for (int x=3; x<13; x++) {
+				if (getAppName(appToLoad,x-3) != 0) PrintChar(x,0,getAppName(appToLoad,x-3));
+			}
 			WaitVsync(20);
 
 			SetRenderingParameters(FIRST_RENDER_LINE,8);
 
-			t32 = FS_Find(&sd_struct, // look for file
+			/*t32 = FS_Find(&sd_struct, // look for file
 	    		((u16)(app[appToLoad].filename[0]) << 8) |
 	    		((u16)(app[appToLoad].filename[1])     ),
 	    		((u16)(app[appToLoad].filename[2]) << 8) |
@@ -1149,13 +1181,30 @@ int main() {
 	    		((u16)(app[appToLoad].filename[8]) << 8) |
 	    		((u16)(app[appToLoad].filename[9])     ),
 	    		((u16)(app[appToLoad].filename[10]) << 8) |
+	    		((u16)(0)       ));*/
+
+			t32 = FS_Find(&sd_struct, // look for file
+	    		((u16)(getAppFileName(appToLoad,0)) << 8) |
+	    		((u16)(getAppFileName(appToLoad,1))     ),
+	    		((u16)(getAppFileName(appToLoad,2)) << 8) |
+	    		((u16)(getAppFileName(appToLoad,3))     ),
+	    		((u16)(getAppFileName(appToLoad,4)) << 8) |
+	    		((u16)(getAppFileName(appToLoad,5))     ),
+	    		((u16)(getAppFileName(appToLoad,6)) << 8) |
+	    		((u16)(getAppFileName(appToLoad,7))     ),
+	    		((u16)(getAppFileName(appToLoad,8)) << 8) |
+	    		((u16)(getAppFileName(appToLoad,9))     ),
+	    		((u16)(getAppFileName(appToLoad,10)) << 8) |
 	    		((u16)(0)       ));
 
 			if (t32 == 0U) { // file not found
 				Fill(1,0,28,1,3);
 				SetTile(1,0,5);
 				Print(3,0,PSTR("No file!"));
-				PrintRam(12,0,app[appToLoad].filename);
+				//PrintRam(12,0,app[appToLoad].filename);
+				for (int x=12; x<22; x++) {
+					if (getAppName(appToLoad,x-12) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-12));
+				}
 				drawWallpaper();
 				redrawAll();
 				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
@@ -1167,12 +1216,15 @@ int main() {
 				FS_Read_Sector(&sd_struct); // read from file
 			}
 
-			app[appToLoad].sectors = vram[3+30];
-			if (app[appToLoad].sectors > 6 && t32 != 0U) { // don't allow files greater than 3KB
+			appSectors = vram[3+30];
+			if (appSectors > 6 && t32 != 0U) { // don't allow files greater than 3KB
 				Fill(1,0,28,1,3);
 				SetTile(1,0,5);
 				Print(3,0,PSTR("File too big!"));
-				PrintRam(17,0,app[appToLoad].filename);
+				//PrintRam(17,0,app[appToLoad].filename);
+				for (int x=17; x<27; x++) {
+					if (getAppName(appToLoad,x-17) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-17));
+				}
 				drawWallpaper();
 				redrawAll();
 				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
@@ -1180,14 +1232,14 @@ int main() {
 				Fill(1,0,28,1,3);
 			}
 
-			if (app[appToLoad].sectors <= 6 && t32 != 0U) {
+			if (appSectors <= 6 && t32 != 0U) {
 				int newWindowNum = 1;
 				for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
 					if (!window[i].created) // this is to figure out where the application data needs to be for the new VM
 						newWindowNum = i;
 				}
 
-				for (int sector=0; sector<app[appToLoad].sectors; sector++) {
+				for (int sector=0; sector<appSectors; sector++) {
 					for (int i=0; i<512; i++) {
 						SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),vram[i+30]); // read data from file into bank 0
 					}
