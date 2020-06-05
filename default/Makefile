@@ -126,7 +126,7 @@ size: ${TARGET}
 ## Clean target
 .PHONY: clean flash read_flash emu
 clean:
-	-rm -rf ../data/tileset.inc ../data/spriteset.inc eeprom.bin $(OBJECTS) $(GAME).eep $(GAME).elf $(GAME).hex $(GAME).lss $(GAME).map $(GAME).o $(GAME).uze dep
+	-rm -rf ../data/tileset.inc ../data/spriteset.inc ../data/fonts/envious-blackbg.inc ../data/fonts/envious-whitebg.inc eeprom.bin $(OBJECTS) $(GAME).eep $(GAME).elf $(GAME).hex $(GAME).lss $(GAME).map $(GAME).o $(GAME).uze dep
 
 flash: all
 	$(AVRDUDE) -U flash:w:$(GAME).hex:i
