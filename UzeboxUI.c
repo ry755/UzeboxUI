@@ -75,6 +75,7 @@ void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
 void printWindowInt(int x, int y, int windowNumber, unsigned int val);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
+void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text);
 void updateButtonClicks();
 void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize, bool isVM);
 void destroyWindow(int windowNumber);
@@ -282,6 +283,14 @@ int fontColor;
 #define whitebg 0
 #define blackbg 1
 
+struct Button {
+	bool created;
+	void (*callback)(); // function that gets called when button is clicked
+	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
+	int isVM; // true if this button lives on a VM window
+	bool VMwasClicked; // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
+};
+
 struct Window {
 	bool created;
 	bool isVM; // true if EmbedVM is running with this window
@@ -297,6 +306,8 @@ struct Window {
 	int prevX; // used while dragging to prevent the screen constantly being redrawn
 	int prevY; // ^
 	bool dragging;
+
+	struct Button button[10];
 } window[11];
 
 /*struct App { // this struct simply holds app names and file names
@@ -304,13 +315,6 @@ struct Window {
 	unsigned char filename[12];
 	int sectors; // number of sectors required to load the file
 } app[10];*/
-
-struct Button {
-	bool created;
-	void (*callback)(); // function that gets called when button is clicked
-	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
-	int window; // window number that this button lives on
-} button[100];
 
 struct Cursor {
 	int x;
@@ -805,20 +809,43 @@ void createButton(int locationX, int locationY, int sizeX, int sizeY, int window
 		}
 	}
 
-	button[buttonNumber].created = true;
-	button[buttonNumber].window = windowNumber;
-	button[buttonNumber].callback = callbackFunc;
-	button[buttonNumber].callbackIntArg = callbackArg1;
+	window[windowNumber].button[buttonNumber].created = true;
+	window[windowNumber].button[buttonNumber].callback = callbackFunc;
+	window[windowNumber].button[buttonNumber].callbackIntArg = callbackArg1;
+
+	window[windowNumber].button[buttonNumber].isVM = false;
+	window[windowNumber].button[buttonNumber].VMwasClicked = false;
+
+	printWindow(locationX,locationY,windowNumber,text);
+}
+
+void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text) { // create a button in a VM. x and y are the location in the window, not on the whole screen
+	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in the upper 32kb of bank 1
+		for (int y=locationY; y<locationY+sizeY; y++) { // ^ to see the button map, add 32768 to the location where the window tiles are read from
+			SpiRamWriteU8(1,(((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)))+32768,buttonNumber);
+		}
+	}
+
+	window[windowNumber].button[buttonNumber].created = true;
+
+	window[windowNumber].button[buttonNumber].isVM = true;
+	window[windowNumber].button[buttonNumber].VMwasClicked = false;
 
 	printWindow(locationX,locationY,windowNumber,text);
 }
 
 void updateButtonClicks() {
 	int buttonNumber = SpiRamReadU8(1,((((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)))+32768); // this will contain the button number that was clicked
-	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && button[buttonNumber].created) { // check that the button number is valid, works around a bug that only exists on real hardware
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[getActiveWindow()].button[buttonNumber].created && !window[getActiveWindow()].button[buttonNumber].isVM) { // (not VM) check that the button number is valid, works around a bug that only exists on real hardware
 		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
 		window[getActiveWindow()].clickY = 300;
-		button[buttonNumber].callback(button[buttonNumber].callbackIntArg); // call the function assigned to this button
+		window[getActiveWindow()].button[buttonNumber].callback(window[getActiveWindow()].button[buttonNumber].callbackIntArg); // call the function assigned to this button
+	}
+
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[getActiveWindow()].button[buttonNumber].created && window[getActiveWindow()].button[buttonNumber].isVM) { // (VM) check that the button number is valid, works around a bug that only exists on real hardware
+		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
+		window[getActiveWindow()].clickY = 300;
+		window[getActiveWindow()].button[buttonNumber].VMwasClicked = true; // this button was clicked. when the VM checks the button, this gets reset back to false
 	}
 }
 
@@ -902,11 +929,10 @@ void destroyWindow(int windowNumber) {
 		window[getActiveWindow()].title[i] = '\0';
 	}
 
-	for (int buttonNum=0; buttonNum<100; buttonNum++) { // remove any buttons that may have been on this window
-		if (button[buttonNum].created && button[buttonNum].window == windowNumber) {
-			button[buttonNum].created = false;
-			button[buttonNum].window = 0;
-			button[buttonNum].callback = 0;
+	for (int buttonNum=0; buttonNum<10; buttonNum++) { // remove any buttons that may have been on this window
+		if (window[windowNumber].button[buttonNum].created) {
+			window[windowNumber].button[buttonNum].created = false;
+			window[windowNumber].button[buttonNum].callback = 0;
 		}
 	}
 
@@ -983,8 +1009,10 @@ void initialize() {
 	menu.selectedMenuItem = 0;
 	menu.clickedMenuItem = 0;
 
-	for (int i=0; i<100; i++) {
-		button[i].created = false; // no buttons are created yet, so set all to false
+	for (int num=0; num<10; num++) {
+		for (int i=0; i<10; i++) {
+			window[num].button[i].created = false; // no buttons are created yet, so set all to false
+		}
 	}
 
 	if (!SpiRamInit()) { // initialize SPIRAM
