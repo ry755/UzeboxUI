@@ -132,28 +132,37 @@ const char windowMenu[][154] PROGMEM = {
 
 // EmbedVM ///////////////////////////////////////////////////////////////
 
+unsigned int activeVM = 0;
+
 struct embedvm_s vm[11] = { };
 
 int16_t mem_read(uint16_t addr, bool is16bit, void *ctx) {
-	if (addr + (is16bit ? 1 : 0) >= 32768) {
+	/*if (((3072*(activeVM-1))+addr) + (is16bit ? 1 : 0) >= 32768) {
+		PrintInt(8,23,0,false);
 		return 0;
-	}
+	}*/
 	if (is16bit) {
-		return (SpiRamReadU8(0,addr) << 8) | SpiRamReadU8(0,addr+1);
+		return (SpiRamReadU8(0,((3072*(activeVM-1))+addr)) << 8) | SpiRamReadU8(0,((3072*(activeVM-1))+addr)+1);
 	}
-	return SpiRamReadU8(0,addr);
+	//Print(1,23,PSTR("r: "));
+	//PrintInt(8,23,((3072*(activeVM-1))+addr),false);
+	return SpiRamReadU8(0,((3072*(activeVM-1))+addr));
 }
 
 void mem_write(uint16_t addr, int16_t value, bool is16bit, void *ctx) {
-	if (addr + (is16bit ? 1 : 0) >= 32768) {
+	/*if (((3072*(activeVM-1))+addr) + (is16bit ? 1 : 0) >= 32768) {
+		PrintInt(8,24,0,false);
 		return;
-	}
+	}*/
 	if (is16bit) {
-		SpiRamWriteU8(0,addr,value >> 8);
-		SpiRamWriteU8(0,addr+1,value);
+		SpiRamWriteU8(0,((3072*(activeVM-1))+addr),value >> 8);
+		SpiRamWriteU8(0,((3072*(activeVM-1))+addr)+1,value);
 	} else {
-		SpiRamWriteU8(0,addr,value);
+		SpiRamWriteU8(0,((3072*(activeVM-1))+addr),value);
 	}
+
+	//Print(1,24,PSTR("w: "));
+	//PrintInt(8,24,((3072*(activeVM-1))+addr),false);
 }
 
 char tempChar[32];
@@ -172,7 +181,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		}
 		return 0;
 	}
-	if (funcid == 1) { // create a window
+	if (funcid == 1 && argc == 5) { // create a window
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int sizeX = argv[2];
@@ -182,7 +191,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		createWindow(locationX,locationY,sizeX,sizeY,tempChar,titleSize,true);
 		return 0;
 	}
-	if (funcid == 2) { // print in a window
+	if (funcid == 2 && argc == 5) { // print in a window
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int windowNumber = argv[2];
@@ -196,13 +205,13 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 	if (funcid == 3) { // return current active window number
 		return getActiveWindow();
 	}
-	if (funcid == 4) { // clear window
+	if (funcid == 4 && argc == 2) { // clear window
 		int windowNumber = argv[0];
 		int tile = argv[1];
 		clearWindow(windowNumber, tile);
 		return 0;
 	}
-	if (funcid == 5) { // set a tile in a window
+	if (funcid == 5 && argc == 4) { // set a tile in a window
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int windowNumber = argv[2];
@@ -211,7 +220,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		setWindowTile(locationX,locationY,windowNumber,tile);
 		return 0;
 	}
-	if (funcid == 6) { // set a ramtile in a window
+	if (funcid == 6 && argc == 4) { // set a ramtile in a window
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int windowNumber = argv[2];
@@ -220,7 +229,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		setWindowTile(locationX,locationY,windowNumber,tile-RAM_TILES_COUNT);
 		return 0;
 	}
-	if (funcid == 7) { // write to a ramtile
+	if (funcid == 7 && argc == 4) { // write to a ramtile
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int ramtile = argv[2];
@@ -892,8 +901,10 @@ void clearWindow(int windowNumber, int tile) {
 	}
 }
 
-void setActiveWindow(int windowNumber) { // very simple, but i'm making this a function in case i need to add more later
+void setActiveWindow(int windowNumber) {
 	activeWindow = windowNumber;
+	if (window[windowNumber].isVM && window[windowNumber].VMrunning)
+		activeVM = windowNumber;
 }
 
 int getActiveWindow() {
@@ -1234,9 +1245,13 @@ int main() {
 
 			if (appSectors <= 6 && t32 != 0U) {
 				int newWindowNum = 1;
+				int numberOfUsedSlots = 0;
 				for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
-					if (!window[i].created) // this is to figure out where the application data needs to be for the new VM
+					if (!window[i].created) { // this is to figure out where the application data needs to be for the new VM
 						newWindowNum = i;
+					} else {
+						numberOfUsedSlots++;
+					}
 				}
 
 				for (int sector=0; sector<appSectors; sector++) {
@@ -1252,7 +1267,7 @@ int main() {
 
 				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 
-				createVM();
+				createVM(newWindowNum,numberOfUsedSlots);
 			}
 
 			Fill(1,0,28,1,3);
@@ -1260,8 +1275,13 @@ int main() {
 		}
 
 		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
+			int num = getActiveWindow();
+			//Print(1,20,PSTR("sp:"));
+			//Print(1,21,PSTR("ip:"));
 			for (int i=10; i>0; i--) { // execute 10 instructions
-				embedvm_exec(&vm[getActiveWindow()]);
+				embedvm_exec(&vm[num]);
+				//PrintInt(8,20,vm[num].sp,false);
+				//PrintInt(8,21,vm[num].ip,false);
 			}
 		}
 
@@ -1269,25 +1289,19 @@ int main() {
 	}
 }
 
-void createVM() {
-	int newWindowNum = 1; // the window number that will be assigned to the window created by this VM
-	int numberOfUsedSlots = 0;
-
-	for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
-		if (!window[i].created) {
-			newWindowNum = i;
-		} else {
-			numberOfUsedSlots++;
-		}
-	}
-
+void createVM(int newWindowNum, int numberOfUsedSlots) {
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
-		vm[newWindowNum].ip = 3072*(newWindowNum-1); // this entry point should contain a jump to main()
-		vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
+		//vm[newWindowNum].ip = 3072*(newWindowNum-1); // this entry point should contain a jump to main()
+		vm[newWindowNum].ip = 0x0000; // this entry point should contain a jump to main()
+		//vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
+		vm[newWindowNum].sp = vm[newWindowNum].sfp = 33024;
 		vm[newWindowNum].mem_read = &mem_read;
 		vm[newWindowNum].mem_write = &mem_write;
 		vm[newWindowNum].call_user = &call_user;
-		embedvm_interrupt(&vm[newWindowNum], 3072*(newWindowNum-1));
+		activeVM = newWindowNum;
+
+		//embedvm_interrupt(&vm[newWindowNum], 3072*(newWindowNum-1));
+		embedvm_interrupt(&vm[newWindowNum], 0x0000);
 
 		window[newWindowNum].isVM = true;
 		window[newWindowNum].VMrunning = true;
