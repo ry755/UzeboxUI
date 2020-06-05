@@ -31,20 +31,18 @@
 
 #include "data/tileset.inc"
 #include "data/spriteset.inc"
-//#include "data/fonts/font-8x8-full.inc"
-//#include "data/fonts/font-8x8-full-invert.inc"
 #include "data/fonts/envious-blackbg.inc"
 #include "data/fonts/envious-whitebg.inc"
 
-int btnHeld = 0;		// buttons held right now
-int btnPressed = 0;		// buttons pressed this frame
-int btnReleased = 0;	// buttons released this frame
-int btnPrev = 0;		// buttons previously pressed
+int btnHeld = 0;          // buttons held right now
+int btnPressed = 0;       // buttons pressed this frame
+int btnReleased = 0;      // buttons released this frame
+int btnPrev = 0;          // buttons previously pressed
 
-int wallpaperTile = 1;	// default wallpaper tile is 1
+int wallpaperTile = 1;    // default wallpaper tile is 1
 
-uint32_t frame = 0;		// frame counter
-uint32_t uptime = 0;	// uptime counter in seconds
+uint32_t frame = 0;       // frame counter
+uint32_t uptime = 0;      // uptime counter in seconds
 
 int appToLoad = 0;
 int numberOfApps = 0;
@@ -57,7 +55,6 @@ extern unsigned char ram_tiles[];
 // sd card stuff
 u8  res;
 sdc_struct_t sd_struct;
-//u8  buf[512];
 u32 t32;
 
 void updateCursor();
@@ -229,12 +226,6 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 
 //////////////////////////////////////////////////////////////////////////
 
-/*const char cursor_map[] PROGMEM = {
-	2,2, // width/height of map
-	1,2, // tile indexes
-	3,4
-};*/
-
 const char cursor_map[] PROGMEM = {
 	1,2, // width/height of map
 	1 // tile indexes
@@ -291,7 +282,6 @@ struct Menu {
 } menu;
 
 void updateCursor() {
-	//MoveSprite(0,cursor.x,cursor.y,2,2); // 16x16, good looking but too big
 	sprites[0].x = cursor.x;
 	sprites[0].y = cursor.y;
 
@@ -875,7 +865,6 @@ void destroyWindow(int windowNumber) {
 	drawWallpaper();
 	redrawAll();
 
-	//Print(20,25,PSTR("Destroyed"));
 	setActiveWindow(getActiveWindow()-1);
 }
 
@@ -926,15 +915,6 @@ void initialize() {
 	menu.selectedMenu = 0;
 	menu.selectedMenuItem = 0;
 	menu.clickedMenuItem = 0;
-
-	/*SetRenderingParameters(20,8); // only render first line, speeds up clearing spiram
-	for (unsigned int i=0; i<60000; i++) { // clear spiram
-		SpiRamWriteU8(0,i,0);
-		SpiRamWriteU8(1,i,0);
-		PrintInt(8,0,i,false);
-	}
-	SetRenderingParameters(20,216);
-	Fill(1,0,28,1,3);*/
 
 	for (int i=0; i<100; i++) {
 		button[i].created = false; // no buttons are created yet, so set all to false
@@ -1040,7 +1020,9 @@ int main() {
 	SetUserPreVsyncCallback(&vsyncCallback);
 	initialize();
 
-	//SetRenderingParameters(FIRST_RENDER_LINE,8); // setting the rendering parameters to cover the affected VRAM area seems to break sd init?
+	//SetRenderingParameters(FIRST_RENDER_LINE,8);
+	// setting the rendering parameters to not render the affected VRAM area seems to break sd init?
+	// not a big deal, the rendering parameters can still be set for reading the actual file later
 
 	sd_struct.bufp = &(vram[30]);
 
@@ -1078,6 +1060,9 @@ int main() {
 	FS_Read_Sector(&sd_struct); // read from file
 
 	// parse the config file
+	// TODO: add some basic protection to this,
+	// don't allow app names longer than 10 characters,
+	// filenames longer than 11 characters, etc.
 	int nameIndex = 0;
 	bool readingName = false;
 	bool readingFilename = false;
@@ -1118,8 +1103,6 @@ int main() {
 			nameIndex++;
 		}
 	}
-
-	//SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
 
 	ClearVram();
 	splash();
@@ -1293,7 +1276,7 @@ void createTilesWindow() {
 	printWindowInt(4,3,getActiveWindow(),TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+FONT_INVERT_SIZE); // sum of sizes of all tilesets
 
 	printWindow(1,5,getActiveWindow(),"RAM Tiles");
-	printWindowInt(2,7,getActiveWindow(),RAM_TILES_COUNT);
+	printWindowInt(3,7,getActiveWindow(),RAM_TILES_COUNT);
 
 	printWindow(1,9,getActiveWindow(),"Fonts");
 	printWindowInt(4,11,getActiveWindow(),FONT_SIZE+FONT_INVERT_SIZE);
