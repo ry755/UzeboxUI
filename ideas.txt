@@ -1,2 +1,0 @@
-for window management, create a new array/table in SPIRAM. this will hold the tiles used in each window
-when a window gets moved, redraw it using the tile array in SPIRAM. this is sorta like a framebuffer for each window
