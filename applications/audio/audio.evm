@@ -1,0 +1,28 @@
+array8u jump[3];	// empty space so a jump instruction can be inserted by the build script
+array8u size[1];	// empty space so the number of sectors can be inserted by the build script
+
+$include "../libUI.inc"
+
+function main() {
+	local note,num,delay;
+	note = 0;
+	createWindow(5,5,10,10,"Audio",5);
+	num = $uf3(); // get window number
+	clearWindow(num,0);
+	printWindow(0,3,num,"This is",7,1);
+	printWindow(0,4,num,"an audio",8,1);
+	printWindow(0,5,num,"demo",4,1);
+	for (delay=50; delay>0; delay--){} // wait for a bit
+	playPatch(5,127);
+	playPatch(6,127);
+	while(1) {
+		playNote(0,0,note,127);
+		note++;
+		printWindowInt(3,7,num,note,1);
+		if (note > 128) {
+			note = 0;
+			printWindow(1,7,num,"   ",3,1);
+		}
+		for (delay=5; delay>0; delay--){} // wait for a bit
+	}
+}
