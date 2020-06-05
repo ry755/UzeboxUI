@@ -150,7 +150,7 @@ void mem_write(uint16_t addr, int16_t value, bool is16bit, void *ctx) {
 	}
 }
 
-char tempChar[64];
+char tempChar[32];
 int tempInt = 0;
 
 int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
@@ -159,8 +159,10 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 			tempChar[0] = '\0';
 			tempInt = 0;
 		} else {
-			tempChar[tempInt] = argv[0];
-			tempInt++;
+			if (tempInt < 32) {
+				tempChar[tempInt] = argv[0];
+				tempInt++;
+			}
 		}
 		return 0;
 	}
