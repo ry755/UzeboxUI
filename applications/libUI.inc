@@ -14,8 +14,8 @@ function printWindow(locationX,locationY,windowNumber,text,textSize,color) {
 	$uf0(); // call with no args to reset text buffer
 }
 
-function printWindowInt(locationX,locationY,windowNumber,num,color) {
-	$uf10(locationX,locationY,windowNumber,num,color);
+function printWindowInt(locationX,locationY,windowNumber,num,color,zeros) {
+	$uf10(locationX,locationY,windowNumber,num,color,zeros);
 }
 
 function setWindowTile(locationX,locationY,windowNumber,tile) {
@@ -40,4 +40,16 @@ function playPatch(patch,volume) {
 
 function playNote(channel,patch,note,volume) {
 	$uf9(channel,patch,note,volume);
+}
+
+function createButton(locationX,locationY,sizeX,sizeY,windowNumber,buttonNumber,text,textSize,color) {
+	local i;
+	for (i=0; $ptr8u[text, i]; i++)
+		$uf0($ptr8u[text, i]);
+	$uf11(locationX,locationY,sizeX,sizeY,windowNumber,buttonNumber,textSize,color);
+	$uf0(); // call with no args to reset text buffer
+}
+
+function checkButton(windowNumber,buttonNumber) {
+	return $uf12(windowNumber,buttonNumber);
 }

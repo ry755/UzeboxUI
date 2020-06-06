@@ -72,10 +72,10 @@ void redrawAll();
 void drawWallpaper();
 void printWindow(int x, int y, int windowNumber, char *text);
 void printWindowLen(int x, int y, int windowNumber, char *text, int textSize);
-void printWindowInt(int x, int y, int windowNumber, unsigned int val);
+void printWindowInt(int x, int y, int windowNumber, unsigned int val, bool zeropad);
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile);
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1);
-void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text);
+void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, int textSize);
 void updateButtonClicks();
 void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title[], int titleSize, bool isVM);
 void destroyWindow(int windowNumber);
@@ -97,6 +97,53 @@ void settingsChangeWallpaper(int num);
 void settingsSaveWallpaper();
 void createSettingsWindow();
 
+struct Button {
+	bool created;
+	void (*callback)(); // function that gets called when button is clicked
+	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
+	int isVM; // true if this button lives on a VM window
+	bool VMwasClicked; // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
+};
+
+struct Window {
+	bool created;
+	bool isVM; // true if EmbedVM is running with this window
+	bool VMrunning; // if this window is a VM, then this is true if it's currently running
+	int x;
+	int y;
+	int sizeX;
+	int sizeY;
+	unsigned char title[10];
+	int titleSize; // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
+	int clickX;
+	int clickY;
+	int prevX; // used while dragging to prevent the screen constantly being redrawn
+	int prevY; // ^
+	bool dragging;
+
+	struct Button button[15];
+} window[10];
+
+/*struct App { // this struct simply holds app names and file names
+	unsigned char name[11];
+	unsigned char filename[12];
+	int sectors; // number of sectors required to load the file
+} app[10];*/
+
+struct Cursor {
+	int x;
+	int y;
+	bool click; // cursor was clicked and is waiting to be used
+	bool hold; // cursor is being held down
+} cursor;
+
+struct Menu {
+	bool open;
+	int selectedMenu; // the selected menu on the menubar
+	int selectedMenuItem; // menu item that's currently being hovered over
+	int clickedMenuItem; // the menu item that was clicked
+} menu;
+
 // Menu //////////////////////////////////////////////////////////////////
 
 const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
@@ -115,19 +162,6 @@ const char fileMenu[][22] PROGMEM = {
 const char editMenu[][22] PROGMEM = {
 	"Copy      ",
 	"Paste     "
-};
-
-const char windowMenu[][154] PROGMEM = {
-	"             1",
-	"             2",
-	"             3",
-	"             4",
-	"             5",
-	"             6",
-	"             7",
-	"             8",
-	"             9",
-	"            10"
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -256,16 +290,39 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		TriggerNote(channel,patch,note,volume);
 		return 0;
 	}
-	if (funcid == 10 && argc == 5) { // print window int
+	if (funcid == 10 && argc == 6) { // print window int
 		int locationX = argv[0];
 		int locationY = argv[1];
 		int windowNumber = argv[2];
-		int num = argv[3];
+		unsigned int num = argv[3];
 		int color = argv[4];
+		bool zeros = argv[5];
 
 		setFontColor(color);
-		printWindowInt(locationX,locationY,windowNumber,num);
+		printWindowInt(locationX,locationY,windowNumber,num,zeros);
 		return 0;
+	}
+	if (funcid == 11 && argc == 8) { // create button
+		int locationX = argv[0];
+		int locationY = argv[1];
+		int sizeX = argv[2];
+		int sizeY = argv[3];
+		int windowNumber = argv[4];
+		int buttonNumber = argv[5];
+		int textSize = argv[6];
+		int color = argv[7];
+
+		setFontColor(color);
+		createVMButton(locationX,locationY,sizeX,sizeY,windowNumber,buttonNumber,tempChar,textSize);
+		return 0;
+	}
+	if (funcid == 12 && argc == 2) { // check button status
+		int windowNumber = argv[0];
+		int buttonNumber = argv[1];
+
+		bool status = window[windowNumber].button[buttonNumber].VMwasClicked;
+		if (status) window[windowNumber].button[buttonNumber].VMwasClicked = false; // button was checked, set the status back to false
+		return status;
 	}
 	return 0;
 }
@@ -282,53 +339,6 @@ int activeWindow = 0; // keeps track of the window number that's currently activ
 int fontColor;
 #define whitebg 0
 #define blackbg 1
-
-struct Button {
-	bool created;
-	void (*callback)(); // function that gets called when button is clicked
-	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
-	int isVM; // true if this button lives on a VM window
-	bool VMwasClicked; // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
-};
-
-struct Window {
-	bool created;
-	bool isVM; // true if EmbedVM is running with this window
-	bool VMrunning; // if this window is a VM, then this is true if it's currently running
-	int x;
-	int y;
-	int sizeX;
-	int sizeY;
-	unsigned char title[10];
-	int titleSize; // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
-	int clickX;
-	int clickY;
-	int prevX; // used while dragging to prevent the screen constantly being redrawn
-	int prevY; // ^
-	bool dragging;
-
-	struct Button button[10];
-} window[11];
-
-/*struct App { // this struct simply holds app names and file names
-	unsigned char name[11];
-	unsigned char filename[12];
-	int sectors; // number of sectors required to load the file
-} app[10];*/
-
-struct Cursor {
-	int x;
-	int y;
-	bool click; // cursor was clicked and is waiting to be used
-	bool hold; // cursor is being held down
-} cursor;
-
-struct Menu {
-	bool open;
-	int selectedMenu; // the selected menu on the menubar
-	int selectedMenuItem; // menu item that's currently being hovered over
-	int clickedMenuItem; // the menu item that was clicked
-} menu;
 
 void updateCursor() {
 	sprites[0].x = cursor.x;
@@ -499,16 +509,27 @@ void updateMenubar() {
 		setFontColor(blackbg);
 		Print(13,0,PSTR("Window"));
 
-		for (int i=0; i<sizeof(windowMenu)/sizeof(windowMenu[0]); i++) { // draw menu items and highlight them if mouse is over them
-			if (cursor.x > 13*8 && cursor.x < (13+10)*8 && cursor.y > (i+1)*8 && cursor.y < (i+2)*8) { // if mouse is over menu item currently being printed. wow this looks like garbage
+		int numberOfWindows = 0;
+		for (int i=10; i>0; i--) { // check for an empty window slot, starting from the bottom
+			if (window[i].created) {
+				numberOfWindows++;
+			}
+		}
+
+		for (int i=1; i<numberOfWindows+1; i++) { // draw menu items and highlight them if mouse is over them
+			if (cursor.x > 13*8 && cursor.x < (13+10)*8 && cursor.y > (i)*8 && cursor.y < (i+1)*8) { // if mouse is over menu item currently being printed. wow this looks like garbage
 				setFontColor(blackbg);
-				menu.selectedMenuItem = i+1;
+				menu.selectedMenuItem = i;
 			} else {
 				setFontColor(whitebg);
 			}
 
-			Print(13,i+1,windowMenu[i]);
-			if (window[i+1].created) PrintRam(13,i+1,window[i+1].title);
+			//Print(13,i+1,windowMenu[i]);
+			if (window[i].title[0] != '\0') {
+				Print(13,i,PSTR("          "));
+				if (window[i].created)
+					PrintRam(13,i,window[i].title);
+			}
 		}
 
 		setFontColor(blackbg);
@@ -785,7 +806,7 @@ void printWindowLen(int x, int y, int windowNumber, char *text, int textSize) {
 	}
 }
 
-void printWindowInt(int x, int y, int windowNumber, unsigned int val) { // mostly copied from the Uzebox kernel source
+void printWindowInt(int x, int y, int windowNumber, unsigned int val, bool zeropad) { // mostly copied from the Uzebox kernel source
 	unsigned char c,i;
 
 	for (i=0; i<5; i++) {
@@ -793,6 +814,11 @@ void printWindowInt(int x, int y, int windowNumber, unsigned int val) { // mostl
 		if (val>0 || i==0) {
 			if (fontColor == whitebg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+c+16);
 			if (fontColor == blackbg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+c+16);
+		} else {
+			if (zeropad) {
+				if (fontColor == whitebg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+16);
+				if (fontColor == blackbg) setWindowTile(x--,y,windowNumber,TILESET_SIZE+SPRITESET_SIZE+16);
+			}
 		}
 		val = val/10;
 	}
@@ -819,7 +845,7 @@ void createButton(int locationX, int locationY, int sizeX, int sizeY, int window
 	printWindow(locationX,locationY,windowNumber,text);
 }
 
-void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text) { // create a button in a VM. x and y are the location in the window, not on the whole screen
+void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, int textSize) { // create a button in a VM. x and y are the location in the window, not on the whole screen
 	for (int x=locationX; x<locationX+sizeX; x++) { // create a button map in the upper 32kb of bank 1
 		for (int y=locationY; y<locationY+sizeY; y++) { // ^ to see the button map, add 32768 to the location where the window tiles are read from
 			SpiRamWriteU8(1,(((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)))+32768,buttonNumber);
@@ -831,7 +857,7 @@ void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int wind
 	window[windowNumber].button[buttonNumber].isVM = true;
 	window[windowNumber].button[buttonNumber].VMwasClicked = false;
 
-	printWindow(locationX,locationY,windowNumber,text);
+	printWindowLen(locationX,locationY,windowNumber,text,textSize);
 }
 
 void updateButtonClicks() {
@@ -1396,15 +1422,15 @@ void createTilesWindow() {
 
 	setFontColor(whitebg);
 	printWindow(1,1,getActiveWindow(),"Total");
-	printWindowInt(8,3,getActiveWindow(),256-RAM_TILES_COUNT); // 256 is the max amount of tiles that can be used
+	printWindowInt(8,3,getActiveWindow(),256-RAM_TILES_COUNT,false); // 256 is the max amount of tiles that can be used
 	printWindow(5,3,getActiveWindow(),"/");
-	printWindowInt(4,3,getActiveWindow(),TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+FONT_INVERT_SIZE); // sum of sizes of all tilesets
+	printWindowInt(4,3,getActiveWindow(),TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+FONT_INVERT_SIZE,false); // sum of sizes of all tilesets
 
 	printWindow(1,5,getActiveWindow(),"RAM Tiles");
-	printWindowInt(3,7,getActiveWindow(),RAM_TILES_COUNT);
+	printWindowInt(3,7,getActiveWindow(),RAM_TILES_COUNT,false);
 
 	printWindow(1,9,getActiveWindow(),"Fonts");
-	printWindowInt(4,11,getActiveWindow(),FONT_SIZE+FONT_INVERT_SIZE);
+	printWindowInt(4,11,getActiveWindow(),FONT_SIZE+FONT_INVERT_SIZE,false);
 }
 
 // Settings window
