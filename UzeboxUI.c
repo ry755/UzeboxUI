@@ -124,12 +124,6 @@ struct Window {
 	struct Button button[15];
 } window[10];
 
-/*struct App { // this struct simply holds app names and file names
-	unsigned char name[11];
-	unsigned char filename[12];
-	int sectors; // number of sectors required to load the file
-} app[10];*/
-
 struct Cursor {
 	int x;
 	int y;
@@ -750,7 +744,7 @@ void updateActiveWindow() {
 }
 
 void updateInactiveTitlebars() {
-	for (int i=1; i<9; i++) {
+	for (int i=1; i<10; i++) {
 		if (window[i].created && i != getActiveWindow()) {
 			setFontColor(blackbg);
 			Fill(window[i].x,window[i].y-1,window[i].sizeX,1,0); // draw titlebar
@@ -1241,7 +1235,7 @@ int main() {
 		updateCursor();
 		updateClick();
 
-		updateInactiveTitlebars();
+		//updateInactiveTitlebars();
 		updateActiveWindow();
 
 		handleMenuClick();
@@ -1262,20 +1256,6 @@ int main() {
 			WaitVsync(20);
 
 			SetRenderingParameters(FIRST_RENDER_LINE,8);
-
-			/*t32 = FS_Find(&sd_struct, // look for file
-	    		((u16)(app[appToLoad].filename[0]) << 8) |
-	    		((u16)(app[appToLoad].filename[1])     ),
-	    		((u16)(app[appToLoad].filename[2]) << 8) |
-	    		((u16)(app[appToLoad].filename[3])     ),
-	    		((u16)(app[appToLoad].filename[4]) << 8) |
-	    		((u16)(app[appToLoad].filename[5])     ),
-	    		((u16)(app[appToLoad].filename[6]) << 8) |
-	    		((u16)(app[appToLoad].filename[7])     ),
-	    		((u16)(app[appToLoad].filename[8]) << 8) |
-	    		((u16)(app[appToLoad].filename[9])     ),
-	    		((u16)(app[appToLoad].filename[10]) << 8) |
-	    		((u16)(0)       ));*/
 
 			t32 = FS_Find(&sd_struct, // look for file
 	    		((u16)(getAppFileName(appToLoad,0)) << 8) |
@@ -1374,16 +1354,13 @@ int main() {
 
 void createVM(int newWindowNum, int numberOfUsedSlots) {
 	if (numberOfUsedSlots < 10) { // only create a new window if there is an empty window slot
-		//vm[newWindowNum].ip = 3072*(newWindowNum-1); // this entry point should contain a jump to main()
 		vm[newWindowNum].ip = 0x0000; // this entry point should contain a jump to main()
-		//vm[newWindowNum].sp = vm[newWindowNum].sfp = 32768 - (3072*(newWindowNum-1)); // each VM gets 3KB for its stack
 		vm[newWindowNum].sp = vm[newWindowNum].sfp = 33024;
 		vm[newWindowNum].mem_read = &mem_read;
 		vm[newWindowNum].mem_write = &mem_write;
 		vm[newWindowNum].call_user = &call_user;
 		activeVM = newWindowNum;
 
-		//embedvm_interrupt(&vm[newWindowNum], 3072*(newWindowNum-1));
 		embedvm_interrupt(&vm[newWindowNum], 0x0000);
 
 		window[newWindowNum].isVM = true;
