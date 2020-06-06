@@ -18,7 +18,7 @@ function main() {
 	while(1) {
 		playNote(0,0,note,127);
 		note++;
-		printWindowInt(3,7,num,note,1);
+		printWindowInt(3,7,num,note,1,false);
 		if (note > 128) {
 			note = 0;
 			printWindow(1,7,num,"   ",3,1);
