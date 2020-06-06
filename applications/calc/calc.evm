@@ -1,0 +1,208 @@
+array8u jump[3];	// empty space so a jump instruction can be inserted by the build script
+array8u size[1];	// empty space so the number of sectors can be inserted by the build script
+
+$include "../libUI.inc"
+
+function concatenate(x,y) {
+    local i;
+	i = 10;
+    while(y >= i)
+        i *= 10;
+    return x * i + y;
+}
+
+function main() {
+	local button,num,calc1,calc2,operator,answer,current_operand,digits;
+	digits = 0;
+	current_operand = 1;
+	operator = 0;
+	createWindow(5,5,11,12,"Calc",4);
+	num = $uf3(); // get window number
+	clearWindow(num,3);
+
+	createButton(3,10,1,1,num,10,"0",1,0);
+	createButton(1,8,1,1,num,1,"1",1,0);
+	createButton(3,8,1,1,num,2,"2",1,0);
+	createButton(5,8,1,1,num,3,"3",1,0);
+	createButton(1,6,1,1,num,4,"4",1,0);
+	createButton(3,6,1,1,num,5,"5",1,0);
+	createButton(5,6,1,1,num,6,"6",1,0);
+	createButton(1,4,1,1,num,7,"7",1,0);
+	createButton(3,4,1,1,num,8,"8",1,0);
+	createButton(5,4,1,1,num,9,"9",1,0);
+
+	createButton(7,4,3,1,num,11," C ",3,1);
+
+	createButton(7,6,3,1,num,12," + ",3,1);
+
+	createButton(7,8,3,1,num,13," - ",3,1);
+
+	createButton(7,10,3,1,num,14," = ",3,1);
+
+	// 0 button outline
+	setWindowTile(2,9,num,45);
+	setWindowTile(2,10,num,10);
+	setWindowTile(4,9,num,45);
+	setWindowTile(4,10,num,10);
+	setWindowTile(3,9,num,11);
+	setWindowTile(3,11,num,11);
+	setWindowTile(2,11,num,42);
+	setWindowTile(4,11,num,41);
+
+	// 1 button outline
+	setWindowTile(0,7,num,47);
+	setWindowTile(0,8,num,10);
+	setWindowTile(2,7,num,45);
+	setWindowTile(2,8,num,10);
+	setWindowTile(1,9,num,11);
+	setWindowTile(1,7,num,11);
+	setWindowTile(0,9,num,42);
+
+	// 2 button outline
+	setWindowTile(3,7,num,11);
+	setWindowTile(4,8,num,10);
+	setWindowTile(4,7,num,45);
+
+	// 3 button outline
+	setWindowTile(5,7,num,11);
+	setWindowTile(6,8,num,10);
+	setWindowTile(6,7,num,46);
+	setWindowTile(5,9,num,11);
+	setWindowTile(6,9,num,41);
+
+	// 4 button outline
+	setWindowTile(1,5,num,11);
+	setWindowTile(0,6,num,10);
+	setWindowTile(0,5,num,47);
+	setWindowTile(2,6,num,10);
+	setWindowTile(2,5,num,45);
+
+	// 5 button outline
+	setWindowTile(3,5,num,11);
+	setWindowTile(4,6,num,10);
+	setWindowTile(4,5,num,45);
+
+	// 6 button outline
+	setWindowTile(5,5,num,11);
+	setWindowTile(6,6,num,10);
+	setWindowTile(6,5,num,46);
+
+	// 7 button outline
+	setWindowTile(1,3,num,11);
+	setWindowTile(0,4,num,10);
+	setWindowTile(0,3,num,44);
+	setWindowTile(2,4,num,10);
+	setWindowTile(2,3,num,48);
+
+	// 8 button outline
+	setWindowTile(3,3,num,11);
+	setWindowTile(4,4,num,10);
+	setWindowTile(4,3,num,48);
+
+	// 9 button outline
+	setWindowTile(5,3,num,11);
+	setWindowTile(6,4,num,10);
+	setWindowTile(6,3,num,43);
+
+	// number display outline
+	setWindowTile(0,1,num,10);
+	setWindowTile(0,0,num,44);
+	setWindowTile(1,0,num,11);
+	setWindowTile(2,0,num,11);
+	setWindowTile(3,0,num,11);
+	setWindowTile(4,0,num,11);
+	setWindowTile(5,0,num,11);
+	setWindowTile(6,0,num,43);
+	setWindowTile(6,1,num,10);
+	setWindowTile(6,2,num,41);
+	setWindowTile(5,2,num,11);
+	setWindowTile(4,2,num,11);
+	setWindowTile(3,2,num,11);
+	setWindowTile(2,2,num,11);
+	setWindowTile(1,2,num,11);
+	setWindowTile(0,2,num,42);
+
+	// operation display outline
+	setWindowTile(7,1,num,10);
+	setWindowTile(7,0,num,44);
+	setWindowTile(8,0,num,11);
+	setWindowTile(9,0,num,43);
+	setWindowTile(9,1,num,10);
+	setWindowTile(9,2,num,41);
+	setWindowTile(8,2,num,11);
+	setWindowTile(7,2,num,42);
+
+	while(1) {
+		for (button=0; button<15; button++) {
+			if (checkButton(num,button)) {
+				if (digits <= 4) {
+					if (button <= 9) {
+						if (current_operand == 1) calc1 = concatenate(calc1,button);
+						if (current_operand == 2) calc2 = concatenate(calc2,button);
+						digits++;
+					}
+					if (button == 10) {
+						if (current_operand == 1) calc1 = concatenate(calc1,0);
+						if (current_operand == 2) calc2 = concatenate(calc2,0);
+						digits++;
+					}
+				}
+				if (button == 11) {
+					operator = 0;
+					current_operand = 1;
+					digits = 0;
+					answer = 0;
+					calc1 = 0;
+					calc2 = 0;
+					printWindow(8,1,num," ",1,0);
+					printWindow(1,1,num,"     ",5,0);
+				}
+				if (button == 12) {
+					if (operator != 1) {
+						operator = 1;
+						digits = 0;
+						if (current_operand == 1) {
+							current_operand = 2;
+						} else if (current_operand == 2) {
+							current_operand = 1;
+						}
+						answer = calc1+calc2;
+						printWindow(8,1,num,"+",1,0);
+						printWindow(1,1,num,"     ",5,0);
+					}
+				}
+				if (button == 13) {
+					if (operator != 2) {
+						operator = 2;
+						digits = 0;
+						if (current_operand == 1) {
+							current_operand = 2;
+						} else if (current_operand == 2) {
+							current_operand = 1;
+						}
+						answer = calc1-calc2;
+						printWindow(8,1,num,"-",1,0);
+						printWindow(1,1,num,"     ",5,0);
+					}
+				}
+				if (button == 14) {
+					digits = 0;
+					current_operand = 0;
+					if (operator == 1) {
+						answer = calc1+calc2;
+					} else if (operator == 2) {
+						answer = calc1-calc2;
+					}
+					operator = 0;
+					printWindow(8,1,num,"=",1,0);
+					printWindow(1,1,num,"     ",5,0);
+				}
+			}
+		}
+		if (current_operand == 1 && calc1 >= 0) printWindowInt(5,1,num,calc1,0,false);
+		if (current_operand == 2 && calc2 >= 0) printWindowInt(5,1,num,calc2,0,false);
+		if (current_operand == 0 && answer >= 0) printWindowInt(5,1,num,answer,0,false);
+
+		if ((calc1 < 0) || (calc2 < 0) || (answer < 0)) printWindow(1,1,num,"ERROR",5,0); // can't display negatives or anything higher than 65535
+	}
+}
