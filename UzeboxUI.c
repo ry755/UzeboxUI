@@ -1361,7 +1361,7 @@ int main() {
 			int num = getActiveWindow();
 			//Print(1,20,PSTR("sp:"));
 			//Print(1,21,PSTR("ip:"));
-			for (int i=10; i>0; i--) { // execute 10 instructions
+			for (int i=25; i>0; i--) { // execute 25 instructions
 				embedvm_exec(&vm[num]);
 				//PrintInt(8,20,vm[num].sp,false);
 				//PrintInt(8,21,vm[num].ip,false);
