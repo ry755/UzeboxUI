@@ -45,9 +45,7 @@ int wallpaperTile = 1;       // default wallpaper tile is 1
 uint32_t frame = 0;          // frame counter
 uint32_t uptime = 0;         // uptime counter in seconds
 
-int appToLoad = 0;
 int numberOfApps = 0;
-bool loadApp = false;
 
 struct EepromBlockStruct ebs;
 
@@ -89,6 +87,8 @@ char getAppFileName(int app, int index);
 void initialize();
 void initScreen();
 void splash();
+void loadAppsConfig();
+void loadApp(int appToLoad);
 void vsyncCallback(void);
 void createVM();
 void createAboutWindow();
@@ -680,8 +680,7 @@ void handleMenuClick() {
 			redrawAll();
 		}
 		if (menu.selectedMenu == 10 && menu.clickedMenuItem != 0) { // clicked an option in the apps menu
-			appToLoad = menu.clickedMenuItem-1;
-			loadApp = true;
+			loadApp(menu.clickedMenuItem-1);
 			menu.clickedMenuItem = 0;
 			menu.selectedMenu = 0;
 			menu.selectedMenuItem = 0;
@@ -1035,6 +1034,16 @@ void initialize() {
 		}
 	}
 
+	sd_struct.bufp = &(vram[30]);
+
+	res = FS_Init(&sd_struct);
+	if (res != 0U) {
+		Print(3,0,PSTR("No SD Card!"));
+		while(1);
+	}
+
+	ebs.id = 48879; // eeprom block id
+
 	if (!SpiRamInit()) { // initialize SPIRAM
 		Print(3,0,PSTR("No SPI RAM!"));
 		while(1);
@@ -1126,29 +1135,7 @@ void splash() {
 	WaitVsync(1);
 }
 
-void vsyncCallback(void) {
-	frame++;
-	uptime = frame/60;
-}
-
-int main() {
-	SetUserPreVsyncCallback(&vsyncCallback);
-	initialize();
-
-	//SetRenderingParameters(FIRST_RENDER_LINE,8);
-	// setting the rendering parameters to not render the affected VRAM area seems to break sd init?
-	// not a big deal, the rendering parameters can still be set for reading the actual file later
-
-	sd_struct.bufp = &(vram[30]);
-
-	res = FS_Init(&sd_struct);
-	if (res != 0U) {
-		Print(3,0,PSTR("No SD Card!"));
-		while(1);
-	}
-
-	ebs.id = 48879;
-
+void loadAppsConfig() { // parse the apps menu config file
 	SetRenderingParameters(FIRST_RENDER_LINE,8);
 
 	t32 = FS_Find(&sd_struct, // look for uzeboxui.txt
@@ -1222,6 +1209,109 @@ int main() {
 			nameIndex++;
 		}
 	}
+}
+
+void loadApp(int appToLoad) {
+	setFontColor(whitebg);
+	Fill(1,0,28,1,3);
+	SetTile(1,0,5);
+	//PrintRam(3,0,app[appToLoad].name);
+	for (int x=3; x<13; x++) {
+		if (getAppName(appToLoad,x-3) != 0) PrintChar(x,0,getAppName(appToLoad,x-3));
+	}
+	WaitVsync(20);
+
+	SetRenderingParameters(FIRST_RENDER_LINE,8);
+
+	t32 = FS_Find(&sd_struct, // look for file
+	    ((u16)(getAppFileName(appToLoad,0)) << 8) |
+	    ((u16)(getAppFileName(appToLoad,1))     ),
+	    ((u16)(getAppFileName(appToLoad,2)) << 8) |
+	    ((u16)(getAppFileName(appToLoad,3))     ),
+	    ((u16)(getAppFileName(appToLoad,4)) << 8) |
+	    ((u16)(getAppFileName(appToLoad,5))     ),
+	    ((u16)(getAppFileName(appToLoad,6)) << 8) |
+	    ((u16)(getAppFileName(appToLoad,7))     ),
+	    ((u16)(getAppFileName(appToLoad,8)) << 8) |
+	    ((u16)(getAppFileName(appToLoad,9))     ),
+	    ((u16)(getAppFileName(appToLoad,10)) << 8) |
+	    ((u16)(0)       ));
+
+	if (t32 == 0U) { // file not found
+		Fill(1,0,28,1,3);
+		SetTile(1,0,5);
+		Print(3,0,PSTR("No file!"));
+		//PrintRam(12,0,app[appToLoad].filename);
+		for (int x=12; x<22; x++) {
+			if (getAppName(appToLoad,x-12) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-12));
+		}
+		drawWallpaper();
+		redrawAll();
+		SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
+		WaitVsync(120);
+		Fill(1,0,28,1,3);
+	} else {
+		FS_Select_Cluster(&sd_struct, t32);
+		FS_Reset_Sector(&sd_struct);
+		FS_Read_Sector(&sd_struct); // read from file
+	}
+
+	appSectors = vram[3+30];
+	if (appSectors > 6 && t32 != 0U) { // don't allow files greater than 3KB
+		Fill(1,0,28,1,3);
+		SetTile(1,0,5);
+		Print(3,0,PSTR("File too big!"));
+		//PrintRam(17,0,app[appToLoad].filename);
+		for (int x=17; x<27; x++) {
+			if (getAppName(appToLoad,x-17) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-17));
+		}
+		drawWallpaper();
+		redrawAll();
+		SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
+		WaitVsync(120);
+		Fill(1,0,28,1,3);
+	}
+
+	if (appSectors <= 6 && t32 != 0U) {
+		int newWindowNum = 1;
+		int numberOfUsedSlots = 0;
+		for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
+			if (!window[i].created) { // this is to figure out where the application data needs to be for the new VM
+				newWindowNum = i;
+			} else {
+				numberOfUsedSlots++;
+			}
+		}
+
+		for (int sector=0; sector<appSectors; sector++) {
+			for (int i=0; i<512; i++) {
+				SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),vram[i+30]); // read data from file into bank 0
+			}
+			FS_Next_Sector(&sd_struct);
+			FS_Read_Sector(&sd_struct);
+		}
+
+		drawWallpaper();
+		redrawAll();
+
+		SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
+
+		createVM(newWindowNum,numberOfUsedSlots);
+	}
+
+	Fill(1,0,28,1,3);
+	SetTile(1,0,5);
+}
+
+void vsyncCallback(void) {
+	frame++;
+	uptime = frame/60;
+}
+
+int main() {
+	SetUserPreVsyncCallback(&vsyncCallback);
+	initialize();
+	loadAppsConfig();
 
 	ClearVram();
 	splash();
@@ -1242,100 +1332,6 @@ int main() {
 		updateMenubar();
 
 		updateButtonClicks();
-
-		if (loadApp) {
-			loadApp = false;
-
-			setFontColor(whitebg);
-			Fill(1,0,28,1,3);
-			SetTile(1,0,5);
-			//PrintRam(3,0,app[appToLoad].name);
-			for (int x=3; x<13; x++) {
-				if (getAppName(appToLoad,x-3) != 0) PrintChar(x,0,getAppName(appToLoad,x-3));
-			}
-			WaitVsync(20);
-
-			SetRenderingParameters(FIRST_RENDER_LINE,8);
-
-			t32 = FS_Find(&sd_struct, // look for file
-	    		((u16)(getAppFileName(appToLoad,0)) << 8) |
-	    		((u16)(getAppFileName(appToLoad,1))     ),
-	    		((u16)(getAppFileName(appToLoad,2)) << 8) |
-	    		((u16)(getAppFileName(appToLoad,3))     ),
-	    		((u16)(getAppFileName(appToLoad,4)) << 8) |
-	    		((u16)(getAppFileName(appToLoad,5))     ),
-	    		((u16)(getAppFileName(appToLoad,6)) << 8) |
-	    		((u16)(getAppFileName(appToLoad,7))     ),
-	    		((u16)(getAppFileName(appToLoad,8)) << 8) |
-	    		((u16)(getAppFileName(appToLoad,9))     ),
-	    		((u16)(getAppFileName(appToLoad,10)) << 8) |
-	    		((u16)(0)       ));
-
-			if (t32 == 0U) { // file not found
-				Fill(1,0,28,1,3);
-				SetTile(1,0,5);
-				Print(3,0,PSTR("No file!"));
-				//PrintRam(12,0,app[appToLoad].filename);
-				for (int x=12; x<22; x++) {
-					if (getAppName(appToLoad,x-12) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-12));
-				}
-				drawWallpaper();
-				redrawAll();
-				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
-				WaitVsync(120);
-				Fill(1,0,28,1,3);
-			} else {
-				FS_Select_Cluster(&sd_struct, t32);
-				FS_Reset_Sector(&sd_struct);
-				FS_Read_Sector(&sd_struct); // read from file
-			}
-
-			appSectors = vram[3+30];
-			if (appSectors > 6 && t32 != 0U) { // don't allow files greater than 3KB
-				Fill(1,0,28,1,3);
-				SetTile(1,0,5);
-				Print(3,0,PSTR("File too big!"));
-				//PrintRam(17,0,app[appToLoad].filename);
-				for (int x=17; x<27; x++) {
-					if (getAppName(appToLoad,x-17) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-17));
-				}
-				drawWallpaper();
-				redrawAll();
-				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
-				WaitVsync(120);
-				Fill(1,0,28,1,3);
-			}
-
-			if (appSectors <= 6 && t32 != 0U) {
-				int newWindowNum = 1;
-				int numberOfUsedSlots = 0;
-				for (int i=10; i>0; i--) { // check for an empty window/VM slot, starting from the bottom
-					if (!window[i].created) { // this is to figure out where the application data needs to be for the new VM
-						newWindowNum = i;
-					} else {
-						numberOfUsedSlots++;
-					}
-				}
-
-				for (int sector=0; sector<appSectors; sector++) {
-					for (int i=0; i<512; i++) {
-						SpiRamWriteU8(0,((3072*(newWindowNum-1))+i)+(sector*512),vram[i+30]); // read data from file into bank 0
-					}
-					FS_Next_Sector(&sd_struct);
-					FS_Read_Sector(&sd_struct);
-				}
-
-				drawWallpaper();
-				redrawAll();
-
-				SetRenderingParameters(FIRST_RENDER_LINE,FRAME_LINES);
-
-				createVM(newWindowNum,numberOfUsedSlots);
-			}
-
-			Fill(1,0,28,1,3);
-			SetTile(1,0,5);
-		}
 
 		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
 			int num = getActiveWindow();
