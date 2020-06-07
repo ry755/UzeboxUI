@@ -503,14 +503,14 @@ void updateMenubar() {
 		setFontColor(blackbg);
 		Print(13,0,PSTR("Window"));
 
-		int numberOfWindows = 0;
-		for (int i=10; i>0; i--) { // check for an empty window slot, starting from the bottom
+		int num = 0;
+		for (int i=0; i<10; i++) { // check for slots
 			if (window[i].created) {
-				numberOfWindows++;
+				num = i;
 			}
 		}
 
-		for (int i=1; i<numberOfWindows+1; i++) { // draw menu items and highlight them if mouse is over them
+		for (int i=1; i<num+1; i++) { // draw menu items and highlight them if mouse is over them
 			if (cursor.x > 13*8 && cursor.x < (13+10)*8 && cursor.y > (i)*8 && cursor.y < (i+1)*8) { // if mouse is over menu item currently being printed. wow this looks like garbage
 				setFontColor(blackbg);
 				menu.selectedMenuItem = i;
@@ -519,8 +519,8 @@ void updateMenubar() {
 			}
 
 			//Print(13,i+1,windowMenu[i]);
+			Print(13,i,PSTR("          "));
 			if (window[i].title[0] != '\0') {
-				Print(13,i,PSTR("          "));
 				if (window[i].created)
 					PrintRam(13,i,window[i].title);
 			}
