@@ -88,7 +88,7 @@ void initialize();
 void initScreen();
 void splash();
 void loadAppsConfig();
-void loadApp(int appToLoad);
+void loadApp(int app);
 void vsyncCallback(void);
 void createVM();
 void createAboutWindow();
@@ -1211,39 +1211,37 @@ void loadAppsConfig() { // parse the apps menu config file
 	}
 }
 
-void loadApp(int appToLoad) {
+void loadApp(int app) {
 	setFontColor(whitebg);
 	Fill(1,0,28,1,3);
 	SetTile(1,0,5);
-	//PrintRam(3,0,app[appToLoad].name);
 	for (int x=3; x<13; x++) {
-		if (getAppName(appToLoad,x-3) != 0) PrintChar(x,0,getAppName(appToLoad,x-3));
+		if (getAppName(app,x-3) != 0) PrintChar(x,0,getAppName(app,x-3));
 	}
 	WaitVsync(20);
 
 	SetRenderingParameters(FIRST_RENDER_LINE,8);
 
 	t32 = FS_Find(&sd_struct, // look for file
-	    ((u16)(getAppFileName(appToLoad,0)) << 8) |
-	    ((u16)(getAppFileName(appToLoad,1))     ),
-	    ((u16)(getAppFileName(appToLoad,2)) << 8) |
-	    ((u16)(getAppFileName(appToLoad,3))     ),
-	    ((u16)(getAppFileName(appToLoad,4)) << 8) |
-	    ((u16)(getAppFileName(appToLoad,5))     ),
-	    ((u16)(getAppFileName(appToLoad,6)) << 8) |
-	    ((u16)(getAppFileName(appToLoad,7))     ),
-	    ((u16)(getAppFileName(appToLoad,8)) << 8) |
-	    ((u16)(getAppFileName(appToLoad,9))     ),
-	    ((u16)(getAppFileName(appToLoad,10)) << 8) |
+	    ((u16)(getAppFileName(app,0)) << 8) |
+	    ((u16)(getAppFileName(app,1))     ),
+	    ((u16)(getAppFileName(app,2)) << 8) |
+	    ((u16)(getAppFileName(app,3))     ),
+	    ((u16)(getAppFileName(app,4)) << 8) |
+	    ((u16)(getAppFileName(app,5))     ),
+	    ((u16)(getAppFileName(app,6)) << 8) |
+	    ((u16)(getAppFileName(app,7))     ),
+	    ((u16)(getAppFileName(app,8)) << 8) |
+	    ((u16)(getAppFileName(app,9))     ),
+	    ((u16)(getAppFileName(app,10)) << 8) |
 	    ((u16)(0)       ));
 
 	if (t32 == 0U) { // file not found
 		Fill(1,0,28,1,3);
 		SetTile(1,0,5);
 		Print(3,0,PSTR("No file!"));
-		//PrintRam(12,0,app[appToLoad].filename);
 		for (int x=12; x<22; x++) {
-			if (getAppName(appToLoad,x-12) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-12));
+			if (getAppName(app,x-12) != 0) PrintChar(x,0,getAppFileName(app,x-12));
 		}
 		drawWallpaper();
 		redrawAll();
@@ -1261,9 +1259,8 @@ void loadApp(int appToLoad) {
 		Fill(1,0,28,1,3);
 		SetTile(1,0,5);
 		Print(3,0,PSTR("File too big!"));
-		//PrintRam(17,0,app[appToLoad].filename);
 		for (int x=17; x<27; x++) {
-			if (getAppName(appToLoad,x-17) != 0) PrintChar(x,0,getAppFileName(appToLoad,x-17));
+			if (getAppName(app,x-17) != 0) PrintChar(x,0,getAppFileName(app,x-17));
 		}
 		drawWallpaper();
 		redrawAll();
