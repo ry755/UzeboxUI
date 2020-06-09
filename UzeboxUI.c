@@ -58,6 +58,17 @@ u32 t32;
 
 unsigned int appSectors = 0; // sectors required to load the selected app
 
+const char cursor_map[] PROGMEM = {
+	1,2, // width/height of map
+	1 // tile indexes
+};
+
+int activeWindow = 0; // keeps track of the window number that's currently active and being updated
+
+int fontColor;
+#define whitebg 0
+#define blackbg 1
+
 void updateCursor();
 void updateControllers();
 void setFontColor(int font);
@@ -79,7 +90,6 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 void destroyWindow(int windowNumber);
 void clearWindow(int windowNumber, int tile);
 void setActiveWindow(int windowNumber);
-int getActiveWindow();
 void setAppName(int app, int index, char character);
 char getAppName(int app, int index);
 void setAppFileName(int app, int index, char character);
@@ -233,7 +243,7 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		return 0;
 	}
 	if (funcid == 3) { // return current active window number
-		return getActiveWindow();
+		return activeWindow;
 	}
 	if (funcid == 4 && argc == 2) { // clear window
 		int windowNumber = argv[0];
@@ -322,17 +332,6 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 }
 
 //////////////////////////////////////////////////////////////////////////
-
-const char cursor_map[] PROGMEM = {
-	1,2, // width/height of map
-	1 // tile indexes
-};
-
-int activeWindow = 0; // keeps track of the window number that's currently active and being updated
-
-int fontColor;
-#define whitebg 0
-#define blackbg 1
 
 void updateCursor() {
 	sprites[0].x = cursor.x;
@@ -548,14 +547,14 @@ void updateClick() {
 			redrawAll();
 		}
 
-		if (cursor.x > (window[getActiveWindow()].x)*8 && cursor.x < (window[getActiveWindow()].x+window[getActiveWindow()].sizeX)*8 && cursor.y > (window[getActiveWindow()].y)*8 && cursor.y < (window[getActiveWindow()].y+window[getActiveWindow()].sizeY)*8) { // clicked inside the active window
-			window[getActiveWindow()].clickX = cursor.x - (window[getActiveWindow()].x*8); // set the coords of where the window was clicked, with the window corner as (0,0)
-			window[getActiveWindow()].clickY = cursor.y - (window[getActiveWindow()].y*8);
+		if (cursor.x > (window[activeWindow].x)*8 && cursor.x < (window[activeWindow].x+window[activeWindow].sizeX)*8 && cursor.y > (window[activeWindow].y)*8 && cursor.y < (window[activeWindow].y+window[activeWindow].sizeY)*8) { // clicked inside the active window
+			window[activeWindow].clickX = cursor.x - (window[activeWindow].x*8); // set the coords of where the window was clicked, with the window corner as (0,0)
+			window[activeWindow].clickY = cursor.y - (window[activeWindow].y*8);
 		}
 
-		if (cursor.x > (window[getActiveWindow()].x)*8 && cursor.x < (window[getActiveWindow()].x+window[getActiveWindow()].sizeX)*8 && cursor.y > (window[getActiveWindow()].y-1)*8 && cursor.y < (window[getActiveWindow()].y)*8) { // clicked on the titlebar of the active window
-			if (cursor.x > (window[getActiveWindow()].x)*8 && cursor.x < (window[getActiveWindow()].x+1)*8 && cursor.y > (window[getActiveWindow()].y-1)*8 && cursor.y < (window[getActiveWindow()].y)*8) { // clicked close button
-				destroyWindow(getActiveWindow());
+		if (cursor.x > (window[activeWindow].x)*8 && cursor.x < (window[activeWindow].x+window[activeWindow].sizeX)*8 && cursor.y > (window[activeWindow].y-1)*8 && cursor.y < (window[activeWindow].y)*8) { // clicked on the titlebar of the active window
+			if (cursor.x > (window[activeWindow].x)*8 && cursor.x < (window[activeWindow].x+1)*8 && cursor.y > (window[activeWindow].y-1)*8 && cursor.y < (window[activeWindow].y)*8) { // clicked close button
+				destroyWindow(activeWindow);
 			}
 		}
 
@@ -691,52 +690,52 @@ void handleMenuClick() {
 }
 
 void updateActiveWindow() {
-	if (window[getActiveWindow()].created) {
+	if (window[activeWindow].created) {
 		setFontColor(whitebg);
-		Fill(window[getActiveWindow()].x,window[getActiveWindow()].y-1,window[getActiveWindow()].sizeX,1,8); // draw titlebar
-		for (int curChar=0; curChar<window[getActiveWindow()].titleSize; curChar++) { // print window title TODO: update this to use PrintRam()
-			PrintChar(window[getActiveWindow()].x+curChar+1,window[getActiveWindow()].y-1,window[getActiveWindow()].title[curChar]);
+		Fill(window[activeWindow].x,window[activeWindow].y-1,window[activeWindow].sizeX,1,8); // draw titlebar
+		for (int curChar=0; curChar<window[activeWindow].titleSize; curChar++) { // print window title TODO: update this to use PrintRam()
+			PrintChar(window[activeWindow].x+curChar+1,window[activeWindow].y-1,window[activeWindow].title[curChar]);
 		}
-		SetTile(window[getActiveWindow()].x,window[getActiveWindow()].y-1,14); // draw close button
+		SetTile(window[activeWindow].x,window[activeWindow].y-1,14); // draw close button
 
-		if (cursor.hold && (cursor.x > (window[getActiveWindow()].x)*8 && cursor.x < (window[getActiveWindow()].x+window[getActiveWindow()].sizeX)*8 && cursor.y > (window[getActiveWindow()].y-1)*8 && cursor.y < (window[getActiveWindow()].y)*8)) { // holding, and not on the close button
-			window[getActiveWindow()].dragging = true;
+		if (cursor.hold && (cursor.x > (window[activeWindow].x)*8 && cursor.x < (window[activeWindow].x+window[activeWindow].sizeX)*8 && cursor.y > (window[activeWindow].y-1)*8 && cursor.y < (window[activeWindow].y)*8)) { // holding, and not on the close button
+			window[activeWindow].dragging = true;
 		} else {
 			if (!cursor.hold) {
-				window[getActiveWindow()].dragging = false;
+				window[activeWindow].dragging = false;
 			}
 		}
 
-		if (window[getActiveWindow()].dragging) {
-			if (window[getActiveWindow()].x != window[getActiveWindow()].prevX || window[getActiveWindow()].y != window[getActiveWindow()].prevY) {
+		if (window[activeWindow].dragging) {
+			if (window[activeWindow].x != window[activeWindow].prevX || window[activeWindow].y != window[activeWindow].prevY) {
 				drawWallpaper(); // redraw wallpaper to remove old window tiles
-				window[getActiveWindow()].prevX = window[getActiveWindow()].x;
-				window[getActiveWindow()].prevY = window[getActiveWindow()].y;
+				window[activeWindow].prevX = window[activeWindow].x;
+				window[activeWindow].prevY = window[activeWindow].y;
 				redrawAll(); // hacky, but it works. this redraws all windows on the screen
 			}
-			window[getActiveWindow()].x = (cursor.x/8)-(window[getActiveWindow()].sizeX/2);
-			window[getActiveWindow()].y = (cursor.y/8)+1;
+			window[activeWindow].x = (cursor.x/8)-(window[activeWindow].sizeX/2);
+			window[activeWindow].y = (cursor.y/8)+1;
 
-			if (window[getActiveWindow()].y < 2) {
-				window[getActiveWindow()].y = 2; // don't allow window to go on top of menubar
+			if (window[activeWindow].y < 2) {
+				window[activeWindow].y = 2; // don't allow window to go on top of menubar
 			}
 
-			if (window[getActiveWindow()].y+window[getActiveWindow()].sizeY > 27) {
-				window[getActiveWindow()].y = 27-window[getActiveWindow()].sizeY; // don't allow window to go past the bottom of the screen
+			if (window[activeWindow].y+window[activeWindow].sizeY > 27) {
+				window[activeWindow].y = 27-window[activeWindow].sizeY; // don't allow window to go past the bottom of the screen
 			}
 
-			if (window[getActiveWindow()].x < 0) {
-				window[getActiveWindow()].x = 0; // don't allow window to go past left side of the screen
+			if (window[activeWindow].x < 0) {
+				window[activeWindow].x = 0; // don't allow window to go past left side of the screen
 			}
 
-			if (window[getActiveWindow()].x+window[getActiveWindow()].sizeX > 30) {
-				window[getActiveWindow()].x = 30-window[getActiveWindow()].sizeX; // don't allow window to go past right side of the screen
+			if (window[activeWindow].x+window[activeWindow].sizeX > 30) {
+				window[activeWindow].x = 30-window[activeWindow].sizeX; // don't allow window to go past right side of the screen
 			}
 		}
 
-		for (int x=window[getActiveWindow()].x; x<window[getActiveWindow()].sizeX+window[getActiveWindow()].x; x++) {
-			for (int y=window[getActiveWindow()].y; y<window[getActiveWindow()].sizeY+window[getActiveWindow()].y; y++) {
-				SetTile(x,y,SpiRamReadU8(1,(((y-window[getActiveWindow()].y)*window[getActiveWindow()].sizeX)+(x-window[getActiveWindow()].x))+(getActiveWindow()*(24*29))));
+		for (int x=window[activeWindow].x; x<window[activeWindow].sizeX+window[activeWindow].x; x++) {
+			for (int y=window[activeWindow].y; y<window[activeWindow].sizeY+window[activeWindow].y; y++) {
+				SetTile(x,y,SpiRamReadU8(1,(((y-window[activeWindow].y)*window[activeWindow].sizeX)+(x-window[activeWindow].x))+(activeWindow*(24*29))));
 			}
 		}
 	}
@@ -744,7 +743,7 @@ void updateActiveWindow() {
 
 void updateInactiveTitlebars() {
 	for (int i=1; i<10; i++) {
-		if (window[i].created && i != getActiveWindow()) {
+		if (window[i].created && i != activeWindow) {
 			setFontColor(blackbg);
 			Fill(window[i].x,window[i].y-1,window[i].sizeX,1,0); // draw titlebar
 			for (int curChar=0; curChar<window[i].titleSize; curChar++) { // print title
@@ -755,7 +754,7 @@ void updateInactiveTitlebars() {
 }
 
 void redrawAll() {
-	int prevActive = getActiveWindow(); // save window that was active before running this
+	int prevActive = activeWindow; // save window that was active before running this
 
 	for (int i=0; i<10; i++) { // redraw all windows
 		setActiveWindow(i);
@@ -818,7 +817,7 @@ void printWindowInt(int x, int y, int windowNumber, unsigned int val, bool zerop
 }
 
 void setWindowTile(int x, int y, int windowNumber, unsigned int tile) {
-	if (getActiveWindow() != 0) SpiRamWriteU8(1,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),tile);
+	if (activeWindow != 0) SpiRamWriteU8(1,((y*window[windowNumber].sizeX)+x)+(windowNumber*(24*29)),tile);
 }
 
 void createButton(int locationX, int locationY, int sizeX, int sizeY, int windowNumber, int buttonNumber, char *text, void (*callbackFunc), int callbackArg1) { // create a button. x and y are the location in the window, not on the whole screen
@@ -854,17 +853,17 @@ void createVMButton(int locationX, int locationY, int sizeX, int sizeY, int wind
 }
 
 void updateButtonClicks() {
-	int buttonNumber = SpiRamReadU8(1,((((window[getActiveWindow()].clickY/8)*window[getActiveWindow()].sizeX)+((window[getActiveWindow()].clickX/8)))+(getActiveWindow()*(24*29)))+32768); // this will contain the button number that was clicked
-	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[getActiveWindow()].button[buttonNumber].created && !window[getActiveWindow()].button[buttonNumber].isVM) { // (not VM) check that the button number is valid, works around a bug that only exists on real hardware
-		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
-		window[getActiveWindow()].clickY = 300;
-		window[getActiveWindow()].button[buttonNumber].callback(window[getActiveWindow()].button[buttonNumber].callbackIntArg); // call the function assigned to this button
+	int buttonNumber = SpiRamReadU8(1,((((window[activeWindow].clickY/8)*window[activeWindow].sizeX)+((window[activeWindow].clickX/8)))+(activeWindow*(24*29)))+32768); // this will contain the button number that was clicked
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[activeWindow].button[buttonNumber].created && !window[activeWindow].button[buttonNumber].isVM) { // (not VM) check that the button number is valid, works around a bug that only exists on real hardware
+		window[activeWindow].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
+		window[activeWindow].clickY = 300;
+		window[activeWindow].button[buttonNumber].callback(window[activeWindow].button[buttonNumber].callbackIntArg); // call the function assigned to this button
 	}
 
-	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[getActiveWindow()].button[buttonNumber].created && window[getActiveWindow()].button[buttonNumber].isVM) { // (VM) check that the button number is valid, works around a bug that only exists on real hardware
-		window[getActiveWindow()].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
-		window[getActiveWindow()].clickY = 300;
-		window[getActiveWindow()].button[buttonNumber].VMwasClicked = true; // this button was clicked. when the VM checks the button, this gets reset back to false
+	if (buttonNumber != 0 && buttonNumber >= 1 && buttonNumber < 100 && window[activeWindow].button[buttonNumber].created && window[activeWindow].button[buttonNumber].isVM) { // (VM) check that the button number is valid, works around a bug that only exists on real hardware
+		window[activeWindow].clickX = 300; // reset back to default value of 300, otherwise it will keep thinking the button is clicked until the user clicks somewhere else
+		window[activeWindow].clickY = 300;
+		window[activeWindow].button[buttonNumber].VMwasClicked = true; // this button was clicked. when the VM checks the button, this gets reset back to false
 	}
 }
 
@@ -945,7 +944,7 @@ void destroyWindow(int windowNumber) {
 	window[windowNumber].isVM = false;
 
 	for (int i=0; i<10; i++) {
-		window[getActiveWindow()].title[i] = '\0';
+		window[activeWindow].title[i] = '\0';
 	}
 
 	for (int buttonNum=0; buttonNum<10; buttonNum++) { // remove any buttons that may have been on this window
@@ -958,7 +957,7 @@ void destroyWindow(int windowNumber) {
 	drawWallpaper();
 	redrawAll();
 
-	setActiveWindow(getActiveWindow()-1);
+	setActiveWindow(activeWindow-1);
 }
 
 void clearWindow(int windowNumber, int tile) {
@@ -978,10 +977,6 @@ void setActiveWindow(int windowNumber) {
 	activeWindow = windowNumber;
 	if (window[windowNumber].isVM && window[windowNumber].VMrunning)
 		activeVM = windowNumber;
-}
-
-int getActiveWindow() {
-	return activeWindow;
 }
 
 void setAppName(int app, int index, char character) {
@@ -1064,18 +1059,18 @@ void initScreen() {
 void splash() {
 	SetRenderingParameters(FIRST_RENDER_LINE,8);
 	t32 = FS_Find(&sd_struct, // look for splash.raw
-	((u16)('S') << 8) |
-	((u16)('P')     ),
-	((u16)('L') << 8) |
-	((u16)('A')     ),
-	((u16)('S') << 8) |
-	((u16)('H')     ),
-	((u16)(' ') << 8) |
-	((u16)(' ')     ),
-	((u16)('R') << 8) |
-	((u16)('A')     ),
-	((u16)('W') << 8) |
-    ((u16)(0)       ));
+		((u16)('S') << 8) |
+		((u16)('P')     ),
+		((u16)('L') << 8) |
+		((u16)('A')     ),
+		((u16)('S') << 8) |
+		((u16)('H')     ),
+		((u16)(' ') << 8) |
+		((u16)(' ')     ),
+		((u16)('R') << 8) |
+		((u16)('A')     ),
+		((u16)('W') << 8) |
+    	((u16)(0)       ));
 
 	if (t32 == 0U) { // splash.bin not found, use Uzebox logo instead
 		ClearVram();
@@ -1330,14 +1325,13 @@ int main() {
 
 		updateButtonClicks();
 
-		if (window[getActiveWindow()].isVM && window[getActiveWindow()].VMrunning) {
-			int num = getActiveWindow();
+		if (window[activeWindow].isVM && window[activeWindow].VMrunning) {
 			//Print(1,20,PSTR("sp:"));
 			//Print(1,21,PSTR("ip:"));
 			for (int i=25; i>0; i--) { // execute 25 instructions
-				embedvm_exec(&vm[num]);
-				//PrintInt(8,20,vm[num].sp,false);
-				//PrintInt(8,21,vm[num].ip,false);
+				embedvm_exec(&vm[activeWindow]);
+				//PrintInt(8,20,vm[activeWindow].sp,false);
+				//PrintInt(8,21,vm[activeWindow].ip,false);
 			}
 		}
 
@@ -1371,18 +1365,18 @@ void createVM(int newWindowNum, int numberOfUsedSlots) {
 
 void createAboutWindow() {
 	createWindow(5,5,10,10,"About",5,false);
-	clearWindow(getActiveWindow(),0); // fill window with black tiles (tile 0)
+	clearWindow(activeWindow,0); // fill window with black tiles (tile 0)
 
 	for (int x=3; x<8; x++) {
 		for (int y=1; y<5; y++) {
-			setWindowTile(x,y,getActiveWindow(),23+((y-3)*5)+x); // draw Uzebox logo
+			setWindowTile(x,y,activeWindow,23+((y-3)*5)+x); // draw Uzebox logo
 		}
 	}
 
 	setFontColor(blackbg);
-	printWindow(1,6,getActiveWindow(),"UzeboxUI");
-	printWindow(1,7,getActiveWindow(),"by ry755");
-	printWindow(1,8,getActiveWindow(),"& luawtf");
+	printWindow(1,6,activeWindow,"UzeboxUI");
+	printWindow(1,7,activeWindow,"by ry755");
+	printWindow(1,8,activeWindow,"& luawtf");
 }
 
 // Tiles window (tile info)
@@ -1391,23 +1385,23 @@ void createTilesWindow() {
 	createWindow(5,5,11,13,"Tile Info",9,false);
 
 	setFontColor(whitebg);
-	printWindow(1,1,getActiveWindow(),"Total");
-	printWindowInt(8,3,getActiveWindow(),256-RAM_TILES_COUNT,false); // 256 is the max amount of tiles that can be used
-	printWindow(5,3,getActiveWindow(),"/");
-	printWindowInt(4,3,getActiveWindow(),TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+FONT_INVERT_SIZE,false); // sum of sizes of all tilesets
+	printWindow(1,1,activeWindow,"Total");
+	printWindowInt(8,3,activeWindow,256-RAM_TILES_COUNT,false); // 256 is the max amount of tiles that can be used
+	printWindow(5,3,activeWindow,"/");
+	printWindowInt(4,3,activeWindow,TILESET_SIZE+SPRITESET_SIZE+FONT_SIZE+FONT_INVERT_SIZE,false); // sum of sizes of all tilesets
 
-	printWindow(1,5,getActiveWindow(),"RAM Tiles");
-	printWindowInt(3,7,getActiveWindow(),RAM_TILES_COUNT,false);
+	printWindow(1,5,activeWindow,"RAM Tiles");
+	printWindowInt(3,7,activeWindow,RAM_TILES_COUNT,false);
 
-	printWindow(1,9,getActiveWindow(),"Fonts");
-	printWindowInt(4,11,getActiveWindow(),FONT_SIZE+FONT_INVERT_SIZE,false);
+	printWindow(1,9,activeWindow,"Fonts");
+	printWindowInt(4,11,activeWindow,FONT_SIZE+FONT_INVERT_SIZE,false);
 }
 
 // Settings window
 
 void settingsChangeWallpaper(int num) {
 	wallpaperTile += num;
-	setWindowTile(3,3,getActiveWindow(),wallpaperTile); // update the tile in the settings
+	setWindowTile(3,3,activeWindow,wallpaperTile); // update the tile in the settings
 	drawWallpaper();
 	redrawAll();
 }
@@ -1421,10 +1415,10 @@ void settingsSaveWallpaper() {
 void createSettingsWindow() {
 	createWindow(5,5,16,5,"Settings",8,false);
 	setFontColor(whitebg);
-	printWindow(1,1,getActiveWindow(),"Wallpaper");
+	printWindow(1,1,activeWindow,"Wallpaper");
 
-	setWindowTile(3,3,getActiveWindow(),wallpaperTile);
-	createButton(1,3,1,1,getActiveWindow(),1,"<",settingsChangeWallpaper,-1);
-	createButton(5,3,1,1,getActiveWindow(),2,">",settingsChangeWallpaper,1);
-	createButton(7,3,4,1,getActiveWindow(),3,"Save",settingsSaveWallpaper,0);
+	setWindowTile(3,3,activeWindow,wallpaperTile);
+	createButton(1,3,1,1,activeWindow,1,"<",settingsChangeWallpaper,-1);
+	createButton(5,3,1,1,activeWindow,2,">",settingsChangeWallpaper,1);
+	createButton(7,3,4,1,activeWindow,3,"Save",settingsSaveWallpaper,0);
 }
