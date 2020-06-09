@@ -53,3 +53,7 @@ function createButton(locationX,locationY,sizeX,sizeY,windowNumber,buttonNumber,
 function checkButton(windowNumber,buttonNumber) {
 	return $uf12(windowNumber,buttonNumber);
 }
+
+function getUptime() {
+	return $uf13();
+}

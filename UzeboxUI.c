@@ -328,6 +328,9 @@ int16_t call_user(uint8_t funcid, uint8_t argc, int16_t *argv, void *ctx) {
 		if (status) window[windowNumber].button[buttonNumber].VMwasClicked = false; // button was checked, set the status back to false
 		return status;
 	}
+	if (funcid == 13) { // get uptime in seconds
+		return uptime;
+	}
 	return 0;
 }
 
