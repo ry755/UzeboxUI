@@ -35,15 +35,15 @@
 #include "data/fonts/envious-blackbg.inc"
 #include "data/fonts/envious-whitebg.inc"
 
-int btnHeld = 0;             // buttons held right now
-int btnPressed = 0;          // buttons pressed this frame
-int btnReleased = 0;         // buttons released this frame
-int btnPrev = 0;             // buttons previously pressed
+int btnHeld = 0;                  // buttons held right now
+int btnPressed = 0;               // buttons pressed this frame
+int btnReleased = 0;              // buttons released this frame
+int btnPrev = 0;                  // buttons previously pressed
 
-int wallpaperTile = 1;       // default wallpaper tile is 1
+int wallpaperTile = 1;            // default wallpaper tile is 1
 
-uint32_t frame = 0;          // frame counter
-uint32_t uptime = 0;         // uptime counter in seconds
+uint32_t frame = 0;               // frame counter
+uint32_t uptime = 0;              // uptime counter in seconds
 
 int numberOfApps = 0;
 
@@ -56,14 +56,14 @@ u8  res;
 sdc_struct_t sd_struct;
 u32 t32;
 
-unsigned int appSectors = 0; // sectors required to load the selected app
+unsigned int appSectors = 0;      // sectors required to load the selected app
 
 const char cursor_map[] PROGMEM = {
 	1,2, // width/height of map
 	1 // tile indexes
 };
 
-int activeWindow = 0; // keeps track of the window number that's currently active and being updated
+int activeWindow = 0;             // keeps track of the window number that's currently active and being updated
 
 int fontColor;
 #define whitebg 0
@@ -109,27 +109,27 @@ void createSettingsWindow();
 
 struct Button {
 	bool created;
-	void (*callback)(); // function that gets called when button is clicked
-	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
-	bool isVM; // true if this button lives on a VM window
-	bool VMwasClicked; // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
+	void (*callback)();           // function that gets called when button is clicked
+	int callbackIntArg;           // argument that gets passed to callback function
+	bool isVM;                    // true if this button lives on a VM window
+	bool VMwasClicked;            // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
 };
 
 struct Window {
 	bool created;
-	bool isVM; // true if EmbedVM is running with this window
-	bool VMrunning; // if this window is a VM, then this is true if it's currently running
+	bool isVM;                    // true if EmbedVM is running with this window
+	bool VMrunning;               // if this window is a VM, then this is true if it's currently running
+	bool dragging;                // true if window is being dragged
 	int x;
 	int y;
 	int sizeX;
 	int sizeY;
 	unsigned char title[10];
-	int titleSize; // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
+	int titleSize;                // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
 	int clickX;
 	int clickY;
-	int prevX; // used while dragging to prevent the screen constantly being redrawn
-	int prevY; // ^
-	bool dragging;
+	int prevX;                    // used while dragging to prevent the screen constantly being redrawn
+	int prevY;                    // ^
 
 	struct Button button[15];
 } window[10];
@@ -137,20 +137,20 @@ struct Window {
 struct Cursor {
 	int x;
 	int y;
-	bool click; // cursor was clicked and is waiting to be used
-	bool hold; // cursor is being held down
+	bool click;                   // cursor was clicked and is waiting to be used
+	bool hold;                    // cursor is being held down
 } cursor;
 
 struct Menu {
 	bool open;
-	int selectedMenu; // the selected menu on the menubar
-	int selectedMenuItem; // menu item that's currently being hovered over
-	int clickedMenuItem; // the menu item that was clicked
+	int selectedMenu;             // the selected menu on the menubar
+	int selectedMenuItem;         // menu item that's currently being hovered over
+	int clickedMenuItem;          // the menu item that was clicked
 } menu;
 
 // Menu //////////////////////////////////////////////////////////////////
 
-const char uzeMenu[][44] PROGMEM = { // 30 characters plus 1 for each null terminator. is the extra for null really needed? idk its 4 AM rn
+const char uzeMenu[][44] PROGMEM = {
 	"About     ",
 	"Apps     >",
 	"Settings  ",
