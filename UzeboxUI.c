@@ -111,7 +111,7 @@ struct Button {
 	bool created;
 	void (*callback)(); // function that gets called when button is clicked
 	int callbackIntArg; // argument that gets passed to callback function. there's probably a better way to do this, but i don't know how
-	int isVM; // true if this button lives on a VM window
+	bool isVM; // true if this button lives on a VM window
 	bool VMwasClicked; // if this button is on a VM window, then this will be true if it was clicked. this allows easy checking by the VM
 };
 
