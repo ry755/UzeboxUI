@@ -125,7 +125,6 @@ struct Window {
 	int sizeX;
 	int sizeY;
 	unsigned char title[10];
-	int titleSize;                // TODO: this shouldn't be needed, if i really need to get the size of the title then use sizeof()
 	int clickX;
 	int clickY;
 	int prevX;                    // used while dragging to prevent the screen constantly being redrawn
@@ -696,9 +695,7 @@ void updateActiveWindow() {
 	if (window[activeWindow].created) {
 		setFontColor(whitebg);
 		Fill(window[activeWindow].x,window[activeWindow].y-1,window[activeWindow].sizeX,1,8); // draw titlebar
-		for (int curChar=0; curChar<window[activeWindow].titleSize; curChar++) { // print window title TODO: update this to use PrintRam()
-			PrintChar(window[activeWindow].x+curChar+1,window[activeWindow].y-1,window[activeWindow].title[curChar]);
-		}
+		PrintRam(window[activeWindow].x+1,window[activeWindow].y-1,window[activeWindow].title); // print window title
 		SetTile(window[activeWindow].x,window[activeWindow].y-1,14); // draw close button
 
 		if (cursor.hold && (cursor.x > (window[activeWindow].x)*8 && cursor.x < (window[activeWindow].x+window[activeWindow].sizeX)*8 && cursor.y > (window[activeWindow].y-1)*8 && cursor.y < (window[activeWindow].y)*8)) { // holding, and not on the close button
@@ -749,9 +746,7 @@ void updateInactiveTitlebars() {
 		if (window[i].created && i != activeWindow) {
 			setFontColor(blackbg);
 			Fill(window[i].x,window[i].y-1,window[i].sizeX,1,0); // draw titlebar
-			for (int curChar=0; curChar<window[i].titleSize; curChar++) { // print title
-				PrintChar(window[i].x+curChar+1,window[i].y-1,window[i].title[curChar]);
-			}
+			PrintRam(window[i].x+1,window[i].y-1,window[i].title); // print window title
 		}
 	}
 }
@@ -900,7 +895,7 @@ void createWindow(int locationX, int locationY, int sizeX, int sizeY, char title
 		for (int i=0; i<titleSize; i++) {
 			window[newWindowNum].title[i] = title[i];
 		}
-		window[newWindowNum].titleSize = titleSize;
+		window[newWindowNum].title[titleSize] = '\0';
 		window[newWindowNum].clickX = 300; // 300 if not clicked anywhere
 		window[newWindowNum].clickY = 300;
 		window[newWindowNum].dragging = false;
